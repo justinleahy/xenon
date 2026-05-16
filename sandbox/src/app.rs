@@ -1,4 +1,4 @@
-use engine::{EngineConfig, FixedTimestep, FpsCounter, FrameClock, LifecycleEvent};
+use engine::{EngineConfig, FixedTimestep, FpsCounter, FrameClock, FrameTiming, LifecycleEvent};
 use softbuffer::{Context, Surface};
 use std::sync::Arc;
 use tracing::info;
@@ -30,6 +30,58 @@ impl SandboxApp {
             window: None,
             context: None,
             surface: None,
+        }
+    }
+
+    fn fixed_update(&mut self) {
+        // Future gameplay simulation
+    }
+
+    fn render(&mut self) {
+        let Some(window) = self.window.as_ref() else {
+            return;
+        };
+
+        let Some(surface) = self.surface.as_mut() else {
+            return;
+        };
+
+        let size = window.inner_size();
+
+        if size.width == 0 || size.height == 0 {
+            return;
+        }
+
+        surface
+            .resize(
+                std::num::NonZeroU32::new(size.width).unwrap(),
+                std::num::NonZeroU32::new(size.height).unwrap(),
+            )
+            .expect("failed to resize surface");
+
+        let mut buffer = surface.buffer_mut().expect("failed to get buffer");
+
+        let clear_color = clear_color_to_softbuffer_pixel(self.config.clear_color);
+
+        for pixel in buffer.iter_mut() {
+            *pixel = clear_color;
+        }
+
+        buffer.present().expect("failed to present buffer");
+    }
+
+    fn log_frame_metrics(&mut self, timing: FrameTiming) {
+        if let Some(fps) = self.fps_counter.record_frame(timing.delta) {
+            info!(fps, "fps")
+        }
+
+        if timing.frame_index % 300 == 0 {
+            info!(
+                frame_index = timing.frame_index,
+                delta_ms = timing.delta.as_secs_f64() * 1000.0,
+                elapsed_secs = timing.elapsed.as_secs_f64(),
+                "frame timing"
+            );
         }
     }
 }
@@ -74,55 +126,15 @@ impl ApplicationHandler for SandboxApp {
             }
 
             WindowEvent::RedrawRequested => {
-                let Some(window) = self.window.as_ref() else {
-                    return;
-                };
-
-                let Some(surface) = self.surface.as_mut() else {
-                    return;
-                };
-
-                let size = window.inner_size();
-
-                if size.width == 0 || size.height == 0 {
-                    return;
-                }
-
-                surface
-                    .resize(
-                        std::num::NonZeroU32::new(size.width).unwrap(),
-                        std::num::NonZeroU32::new(size.height).unwrap(),
-                    )
-                    .expect("failed to resize surface");
-
-                let mut buffer = surface.buffer_mut().expect("failed to get buffer");
-
                 let timing = self.frame_clock.tick();
 
-                if let Some(fps) = self.fps_counter.record_frame(timing.delta) {
-                    info!(fps, "fps")
-                }
+                self.log_frame_metrics(timing);
 
                 for _step in self.fixed_timestep.advance(timing.delta) {
-                    // Future fixed gameplay updates go here
+                    self.fixed_update();
                 }
 
-                if timing.frame_index % 300 == 0 {
-                    info!(
-                        frame_index = timing.frame_index,
-                        delta_ms = timing.delta.as_secs_f64() * 1000.0,
-                        elapsed_secs = timing.elapsed.as_secs_f64(),
-                        "frame timing"
-                    );
-                }
-
-                let clear_color = clear_color_to_softbuffer_pixel(self.config.clear_color);
-
-                for pixel in buffer.iter_mut() {
-                    *pixel = clear_color;
-                }
-
-                buffer.present().expect("failed to present buffer");
+                self.render();
             }
 
             _ => {}
