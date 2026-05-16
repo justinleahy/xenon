@@ -1,3 +1,4 @@
+use engine::{EngineConfig, runtime::FrameClock};
 use softbuffer::{Context, Surface};
 use std::sync::Arc;
 use winit::{
@@ -9,16 +10,33 @@ use winit::{
 
 #[derive(Default)]
 pub struct SandboxApp {
+    pub config: EngineConfig,
+    pub frame_clock: FrameClock,
     pub window: Option<Arc<Window>>,
     pub context: Option<Context<Arc<Window>>>,
     pub surface: Option<Surface<Arc<Window>, Arc<Window>>>,
 }
 
+impl SandboxApp {
+    pub fn new(config: EngineConfig) -> Self {
+        Self {
+            config,
+            frame_clock: FrameClock::new(),
+            window: None,
+            context: None,
+            surface: None,
+        }
+    }
+}
+
 impl ApplicationHandler for SandboxApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let attrs = Window::default_attributes()
-            .with_title("Xenon Sandbox")
-            .with_inner_size(winit::dpi::LogicalSize::new(1280.0, 720.0))
+            .with_title(self.config.app_name.clone())
+            .with_inner_size(winit::dpi::LogicalSize::new(
+                self.config.window_width as f64,
+                self.config.window_height as f64,
+            ))
             .with_visible(true);
 
         let window = Arc::new(
@@ -69,8 +87,12 @@ impl ApplicationHandler for SandboxApp {
 
                 let mut buffer = surface.buffer_mut().expect("failed to get buffer");
 
+                let _timing = self.frame_clock.tick();
+
+                let clear_color = clear_color_to_softbuffer_pixel(self.config.clear_color);
+
                 for pixel in buffer.iter_mut() {
-                    *pixel = 0x00203040;
+                    *pixel = clear_color;
                 }
 
                 buffer.present().expect("failed to present buffer");
@@ -85,4 +107,8 @@ impl ApplicationHandler for SandboxApp {
             window.request_redraw();
         }
     }
+}
+
+fn clear_color_to_softbuffer_pixel([r, g, b, _a]: [u8; 4]) -> u32 {
+    ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
 }
