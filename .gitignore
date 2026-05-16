@@ -4,3 +4,7 @@
 # Cargo lockfiles belong at the workspace root for this project.
 /engine/Cargo.lock
 /sandbox/Cargo.lock
+
+# AI Directories
+.agents/
+.codex/
