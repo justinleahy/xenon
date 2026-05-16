@@ -1,6 +1,7 @@
-use engine::{EngineConfig, runtime::FrameClock};
+use engine::runtime::{EngineConfig, FrameClock, LifecycleEvent};
 use softbuffer::{Context, Surface};
 use std::sync::Arc;
+use tracing::info;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -52,6 +53,8 @@ impl ApplicationHandler for SandboxApp {
         self.window = Some(window);
         self.context = Some(context);
         self.surface = Some(surface);
+
+        info!(event = ?LifecycleEvent::Started, "application started");
     }
 
     fn window_event(
@@ -61,7 +64,10 @@ impl ApplicationHandler for SandboxApp {
         event: WindowEvent,
     ) {
         match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::CloseRequested => {
+                info!(event = ?LifecycleEvent::Stopping, "application stopping");
+                event_loop.exit()
+            }
 
             WindowEvent::RedrawRequested => {
                 let Some(window) = self.window.as_ref() else {
@@ -87,7 +93,16 @@ impl ApplicationHandler for SandboxApp {
 
                 let mut buffer = surface.buffer_mut().expect("failed to get buffer");
 
-                let _timing = self.frame_clock.tick();
+                let timing = self.frame_clock.tick();
+
+                if timing.frame_index % 300 == 0 {
+                    info!(
+                        frame_index = timing.frame_index,
+                        delta_ms = timing.delta.as_secs_f64() * 1000.0,
+                        elapsed_secs = timing.elapsed.as_secs_f64(),
+                        "frame timing"
+                    );
+                }
 
                 let clear_color = clear_color_to_softbuffer_pixel(self.config.clear_color);
 
