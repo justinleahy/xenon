@@ -1,4 +1,4 @@
-use engine::{EngineConfig, FixedTimestep, FrameClock, LifecycleEvent};
+use engine::{EngineConfig, FixedTimestep, FpsCounter, FrameClock, LifecycleEvent};
 use softbuffer::{Context, Surface};
 use std::sync::Arc;
 use tracing::info;
@@ -14,6 +14,7 @@ pub struct SandboxApp {
     pub config: EngineConfig,
     pub frame_clock: FrameClock,
     pub fixed_timestep: FixedTimestep,
+    pub fps_counter: FpsCounter,
     pub window: Option<Arc<Window>>,
     pub context: Option<Context<Arc<Window>>>,
     pub surface: Option<Surface<Arc<Window>, Arc<Window>>>,
@@ -25,6 +26,7 @@ impl SandboxApp {
             config,
             frame_clock: FrameClock::new(),
             fixed_timestep: FixedTimestep::default(),
+            fps_counter: FpsCounter::default(),
             window: None,
             context: None,
             surface: None,
@@ -96,6 +98,10 @@ impl ApplicationHandler for SandboxApp {
                 let mut buffer = surface.buffer_mut().expect("failed to get buffer");
 
                 let timing = self.frame_clock.tick();
+
+                if let Some(fps) = self.fps_counter.record_frame(timing.delta) {
+                    info!(fps, "fps")
+                }
 
                 for _step in self.fixed_timestep.advance(timing.delta) {
                     // Future fixed gameplay updates go here

@@ -14,6 +14,14 @@ pub struct FrameClock {
     frame_index: u64,
 }
 
+#[derive(Debug, Clone)]
+pub struct FpsCounter {
+    sample_window: Duration,
+    accumulated: Duration,
+    frames: u32,
+    last_fps: Option<f64>,
+}
+
 impl FrameClock {
     pub fn new() -> Self {
         let now = Instant::now();
@@ -54,6 +62,57 @@ impl Default for FrameClock {
     }
 }
 
+impl FpsCounter {
+    pub fn new(sample_window: Duration) -> Self {
+        assert!(
+            !sample_window.is_zero(),
+            "fps sample window must be greater than zero"
+        );
+
+        Self {
+            sample_window,
+            accumulated: Duration::ZERO,
+            frames: 0,
+            last_fps: None,
+        }
+    }
+
+    pub fn per_second() -> Self {
+        Self::new(Duration::from_secs(1))
+    }
+
+    pub fn record_frame(&mut self, delta: Duration) -> Option<f64> {
+        self.accumulated = self.accumulated.saturating_add(delta);
+        self.frames += 1;
+
+        if self.accumulated < self.sample_window {
+            return None;
+        }
+
+        let fps = self.frames as f64 / self.accumulated.as_secs_f64();
+
+        self.accumulated = Duration::ZERO;
+        self.frames = 0;
+        self.last_fps = Some(fps);
+
+        Some(fps)
+    }
+
+    pub fn last_fps(&self) -> Option<f64> {
+        self.last_fps
+    }
+
+    pub fn sample_window(&self) -> Duration {
+        self.sample_window
+    }
+}
+
+impl Default for FpsCounter {
+    fn default() -> Self {
+        Self::per_second()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -82,5 +141,37 @@ mod tests {
         assert_eq!(first.frame_index, 1);
         assert_eq!(second.frame_index, 2);
         assert_eq!(clock.frame_index, 2);
+    }
+
+    #[test]
+    fn test_fps_counter_returns_none_before_sample_window() {
+        let mut counter = FpsCounter::new(Duration::from_secs(1));
+
+        let fps = counter.record_frame(Duration::from_millis(500));
+
+        assert_eq!(fps, None);
+        assert_eq!(counter.last_fps(), None);
+    }
+
+    #[test]
+    fn test_fps_counter_returns_fps_when_sample_window_elapses() {
+        let mut counter = FpsCounter::new(Duration::from_secs(1));
+
+        counter.record_frame(Duration::from_millis(500));
+        let fps = counter.record_frame(Duration::from_millis(500)).unwrap();
+
+        assert_eq!(fps, 2.0);
+        assert_eq!(counter.last_fps(), Some(2.0));
+    }
+
+    #[test]
+    fn test_fps_counter_resets_after_sample() {
+        let mut counter = FpsCounter::new(Duration::from_secs(1));
+
+        counter.record_frame(Duration::from_millis(500));
+        counter.record_frame(Duration::from_millis(500));
+        let fps = counter.record_frame(Duration::from_millis(1000)).unwrap();
+
+        assert_eq!(fps, 1.0);
     }
 }
