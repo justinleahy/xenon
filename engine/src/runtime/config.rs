@@ -67,6 +67,20 @@ impl EngineConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    fn temp_config_path(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+
+        std::env::temp_dir().join(format!("xenon-{name}-{nanos}.toml"))
+    }
 
     #[test]
     fn test_validate_valid_config() {
@@ -103,5 +117,75 @@ mod tests {
         };
 
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_load_from_file_loads_valid_toml() {
+        let path = temp_config_path("valid");
+        fs::write(
+            &path,
+            r#"
+app_name = "Test App"
+window_width = 800
+window_height = 600
+clear_color = [1, 2, 3, 255]
+            "#,
+        )
+        .unwrap();
+
+        let config = EngineConfig::load_from_file(&path).unwrap();
+
+        assert_eq!(config.app_name, "Test App");
+        assert_eq!(config.window_width, 800);
+        assert_eq!(config.window_height, 600);
+        assert_eq!(config.clear_color, [1, 2, 3, 255]);
+
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_load_from_file_returns_read_error_for_missing_file() {
+        let path = temp_config_path("missing");
+
+        let result = EngineConfig::load_from_file(&path);
+
+        assert!(matches!(result, Err(RuntimeError::ConfigRead { .. })));
+    }
+
+    #[test]
+    fn test_load_from_file_returns_parse_error_for_malformed_toml() {
+        let path = temp_config_path("malformed");
+
+        fs::write(&path, "app_name = [").unwrap();
+
+        let result = EngineConfig::load_from_file(&path);
+
+        assert!(matches!(result, Err(RuntimeError::ConfigParse { .. })));
+
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_load_from_file_validates_loaded_config() {
+        let path = temp_config_path("invalid");
+        fs::write(
+            &path,
+            r#"
+app_name = "Test App"
+window_width = 0
+window_height = 600
+clear_color = [1, 2, 3, 255]
+            "#,
+        )
+        .unwrap();
+
+        let result = EngineConfig::load_from_file(&path);
+
+        assert!(matches!(
+            result,
+            Err(RuntimeError::InvalidWindowWidth { width: 0 })
+        ));
+
+        fs::remove_file(path).unwrap();
     }
 }

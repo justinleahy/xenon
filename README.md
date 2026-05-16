@@ -8,3 +8,13 @@ Start here:
 
 - [Engine charter](ENGINE_CHARTER.md)
 - [Development phases](GAME_ENGINE_DEVELOPMENT_PHASES.md)
+
+## Run the Sandbox
+
+```bash
+cargo run -p sandbox
+```
+
+The sandbox loads runtime settings from:
+
+sandbox/config/runtime.toml
