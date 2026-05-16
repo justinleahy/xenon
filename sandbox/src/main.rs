@@ -12,8 +12,7 @@ fn main() -> anyhow::Result<()> {
 
     info!(event = ?LifecycleEvent::Starting, "application starting");
 
-    let config = EngineConfig::default();
-    config.validate()?;
+    let config = EngineConfig::load_from_file("sandbox/config/runtime.toml")?;
 
     info!(?config, "runtime config loaded");
 

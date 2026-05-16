@@ -1,6 +1,8 @@
 use crate::RuntimeError;
+use serde::Deserialize;
+use std::path::Path;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct EngineConfig {
     pub app_name: String,
     pub window_width: u32,
@@ -20,6 +22,25 @@ impl Default for EngineConfig {
 }
 
 impl EngineConfig {
+    pub fn load_from_file(path: impl AsRef<Path>) -> Result<Self, RuntimeError> {
+        let path = path.as_ref();
+        let contents =
+            std::fs::read_to_string(path).map_err(|source| RuntimeError::ConfigRead {
+                path: path.to_path_buf(),
+                source,
+            })?;
+
+        let config: Self =
+            toml::from_str(&contents).map_err(|source| RuntimeError::ConfigParse {
+                path: path.to_path_buf(),
+                source,
+            })?;
+
+        config.validate()?;
+
+        Ok(config)
+    }
+
     pub fn validate(&self) -> Result<(), RuntimeError> {
         if self.app_name.trim().is_empty() {
             return Err(RuntimeError::InvalidConfig(

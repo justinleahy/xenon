@@ -1,0 +1,4 @@
+app_name = "Xenon Sandbox"
+window_width = 1280
+window_height = 720
+clear_color = [32, 48, 64, 255]
