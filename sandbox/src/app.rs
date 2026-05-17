@@ -1,5 +1,6 @@
 use engine::{
-    EngineConfig, FixedTimestep, FpsCounter, FrameClock, FrameTiming, LifecycleEvent, Renderer,
+    EngineConfig, FixedTimestep, FpsCounter, FrameClock, FrameTiming, LifecycleEvent, RenderScene,
+    Renderer,
 };
 use std::sync::Arc;
 use tracing::info;
@@ -121,7 +122,12 @@ impl SandboxApp {
         renderer.resize(size.width, size.height);
 
         renderer
-            .render(self.config.clear_color)
+            .render(
+                self.config.clear_color,
+                RenderScene {
+                    player_position: self.state.player_position,
+                },
+            )
             .expect("failed to render frame");
     }
 

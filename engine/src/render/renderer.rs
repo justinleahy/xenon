@@ -1,4 +1,4 @@
-use super::RenderError;
+use super::{RenderError, RenderScene};
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
@@ -43,6 +43,28 @@ const QUAD_VERTICES: &[Vertex] = &[
 
 const QUAD_INDICES: &[u16] = &[0, 1, 2, 0, 2, 3];
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct SceneUniform {
+    translation: [f32; 2],
+    _padding: [f32; 2],
+}
+
+impl SceneUniform {
+    fn from_scene(scene: RenderScene, surface_width: u32, surface_height: u32) -> Self {
+        let width = surface_width.max(1) as f32;
+        let height = surface_height.max(1) as f32;
+
+        Self {
+            translation: [
+                scene.player_position[0] / (width * 0.5),
+                -scene.player_position[1] / (height * 0.5),
+            ],
+            _padding: [0.0, 0.0],
+        }
+    }
+}
+
 pub struct Renderer<'window> {
     _instance: wgpu::Instance,
     surface: wgpu::Surface<'window>,
@@ -54,6 +76,8 @@ pub struct Renderer<'window> {
     quad_vertex_buffer: wgpu::Buffer,
     quad_index_buffer: wgpu::Buffer,
     quad_index_count: u32,
+    scene_uniform_buffer: wgpu::Buffer,
+    scene_bind_group: wgpu::BindGroup,
 }
 
 impl<'window> Renderer<'window> {
@@ -97,9 +121,44 @@ impl<'window> Renderer<'window> {
             source: wgpu::ShaderSource::Wgsl(include_str!("shaders/colored.wgsl").into()),
         });
 
+        let scene_uniform = SceneUniform {
+            translation: [0.0, 0.0],
+            _padding: [0.0, 0.0],
+        };
+
+        let scene_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Xenon Scene Uniform Buffer"),
+            contents: bytemuck::bytes_of(&scene_uniform),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let scene_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Xenon Scene Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let scene_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Xenon Scene Bind Group"),
+            layout: &scene_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: scene_uniform_buffer.as_entire_binding(),
+            }],
+        });
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Xenon Triangle Pipeline Layout"),
-            bind_group_layouts: &[],
+            bind_group_layouts: &[Some(&scene_bind_group_layout)],
             immediate_size: 0,
         });
 
@@ -154,6 +213,8 @@ impl<'window> Renderer<'window> {
             quad_vertex_buffer,
             quad_index_buffer,
             quad_index_count,
+            scene_uniform_buffer,
+            scene_bind_group,
         })
     }
 
@@ -171,7 +232,15 @@ impl<'window> Renderer<'window> {
         self.surface.configure(&self.device, &self.config);
     }
 
-    pub fn render(&mut self, clear_color: [u8; 4]) -> Result<(), RenderError> {
+    pub fn render(&mut self, clear_color: [u8; 4], scene: RenderScene) -> Result<(), RenderError> {
+        let scene_uniform = SceneUniform::from_scene(scene, self.config.width, self.config.height);
+
+        self.queue.write_buffer(
+            &self.scene_uniform_buffer,
+            0,
+            bytemuck::bytes_of(&scene_uniform),
+        );
+
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
@@ -219,6 +288,7 @@ impl<'window> Renderer<'window> {
             });
 
             render_pass.set_pipeline(&self.quad_pipeline);
+            render_pass.set_bind_group(0, &self.scene_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.quad_vertex_buffer.slice(..));
             render_pass
                 .set_index_buffer(self.quad_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
