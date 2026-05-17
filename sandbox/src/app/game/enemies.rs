@@ -117,27 +117,8 @@ impl EnemyState {
 
 #[cfg(test)]
 mod tests {
+    use super::super::test_helpers::scene_with_only_player;
     use super::*;
-
-    fn scene_with_only_player() -> Scene {
-        let mut scene = Scene::new_survivor_demo();
-
-        scene.enemies.clear();
-        scene.projectiles.clear();
-        scene
-            .transforms
-            .retain(|(entity, _)| *entity == scene.player);
-        scene.health.retain(|(entity, _)| *entity == scene.player);
-        scene.sprites.retain(|(entity, _)| *entity == scene.player);
-        scene
-            .circle_colliders
-            .retain(|(entity, _)| *entity == scene.player);
-        scene.damage.clear();
-        scene.death_drops.clear();
-        scene.pickups.clear();
-
-        scene
-    }
 
     #[test]
     fn test_spawning_adds_enemy_after_cooldown() {

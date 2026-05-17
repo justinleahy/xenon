@@ -4,6 +4,8 @@ pub mod enemies;
 pub mod entity;
 pub mod player;
 pub mod scene;
+#[cfg(test)]
+pub mod test_helpers;
 
 pub use combat::CombatState;
 pub use enemies::EnemyState;

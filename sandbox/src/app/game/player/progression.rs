@@ -51,27 +51,8 @@ impl PlayerProgression {
 
 #[cfg(test)]
 mod tests {
+    use super::super::super::test_helpers::scene_with_only_player;
     use super::*;
-
-    fn scene_with_only_player() -> Scene {
-        let mut scene = Scene::new_survivor_demo();
-
-        scene.enemies.clear();
-        scene.projectiles.clear();
-        scene.damage.clear();
-        scene.death_drops.clear();
-        scene.pickups.clear();
-        scene
-            .transforms
-            .retain(|(entity, _)| *entity == scene.player);
-        scene.health.retain(|(entity, _)| *entity == scene.player);
-        scene.sprites.retain(|(entity, _)| *entity == scene.player);
-        scene
-            .circle_colliders
-            .retain(|(entity, _)| *entity == scene.player);
-
-        scene
-    }
 
     #[test]
     fn test_overlapping_pickup_adds_experience_and_despawns_pickup() {

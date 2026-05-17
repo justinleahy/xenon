@@ -114,6 +114,7 @@ fn append_health_bar_sprites(sprites: &mut Vec<RenderSprite>, state: &SandboxSta
 #[cfg(test)]
 mod tests {
     use super::super::game::components::{Sprite, Transform};
+    use super::super::game::test_helpers::scene_with_only_player;
     use super::super::state::SandboxState;
     use super::*;
 
@@ -123,20 +124,10 @@ mod tests {
 
     fn state_with_empty_scene() -> SandboxState {
         let mut state = SandboxState::default();
-        let player = state.scene.player;
-
-        state.scene.enemies.clear();
-        state.scene.projectiles.clear();
+        state.scene = scene_with_only_player();
         state.scene.sprites.clear();
         state.scene.health.clear();
         state.scene.circle_colliders.clear();
-        state.scene.damage.clear();
-        state.scene.death_drops.clear();
-        state.scene.pickups.clear();
-        state
-            .scene
-            .transforms
-            .retain(|(entity, _)| *entity == player);
 
         state
     }
