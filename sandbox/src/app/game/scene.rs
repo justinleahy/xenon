@@ -27,7 +27,7 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn new_survivor_demo(catalog: &GameCatalog) -> Self {
+    pub fn empty() -> Self {
         let mut scene = Self {
             next_entity_id: 0,
             player: EntityId(0),
@@ -68,6 +68,12 @@ impl Scene {
         scene
             .circle_colliders
             .push((player, CircleCollider { radius: 0.35 }));
+
+        scene
+    }
+
+    pub fn new_survivor_demo(catalog: &GameCatalog) -> Self {
+        let mut scene = Self::empty();
 
         scene.spawn_enemy([5.0, 5.0], EnemyKind::Basic, catalog);
 
@@ -279,9 +285,8 @@ mod tests {
     use crate::app::game::WeaponKind;
 
     #[test]
-    fn test_new_survivor_demo_creates_valid_player() {
-        let catalog = GameCatalog::default();
-        let scene = Scene::new_survivor_demo(&catalog);
+    fn test_empty_creates_valid_player() {
+        let scene = Scene::empty();
 
         assert!(scene.transform(scene.player).is_some());
         assert!(scene.sprite(scene.player).is_some());
@@ -289,6 +294,18 @@ mod tests {
         assert_eq!(
             scene.circle_collider(scene.player).unwrap(),
             &CircleCollider { radius: 0.35 }
+        );
+    }
+
+    #[test]
+    fn test_new_survivor_demo_spawns_demo_enemy() {
+        let catalog = GameCatalog::default();
+        let scene = Scene::new_survivor_demo(&catalog);
+
+        assert_eq!(scene.enemies.len(), 1);
+        assert_eq!(
+            scene.enemy(*scene.enemies.first().unwrap()).unwrap().kind,
+            EnemyKind::Basic
         );
     }
 
