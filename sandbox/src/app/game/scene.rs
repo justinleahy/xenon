@@ -1,5 +1,5 @@
 use super::{
-    components::{CircleCollider, Health, Projectile, Sprite, Transform},
+    components::{CircleCollider, Damage, Health, Projectile, Sprite, Transform},
     entity::EntityId,
 };
 
@@ -12,6 +12,7 @@ pub struct Scene {
     pub sprites: Vec<(EntityId, Sprite)>,
     pub projectiles: Vec<(EntityId, Projectile)>,
     pub circle_colliders: Vec<(EntityId, CircleCollider)>,
+    pub damage: Vec<(EntityId, Damage)>,
 }
 
 impl Scene {
@@ -25,6 +26,7 @@ impl Scene {
             sprites: Vec::new(),
             projectiles: Vec::new(),
             circle_colliders: Vec::new(),
+            damage: Vec::new(),
         };
 
         let player = scene.spawn_entity();
@@ -71,10 +73,12 @@ impl Scene {
         self.sprites.retain(|(id, _)| *id != entity);
         self.projectiles.retain(|(id, _)| *id != entity);
         self.circle_colliders.retain(|(id, _)| *id != entity);
+        self.damage.retain(|(id, _)| *id != entity);
     }
 
     pub fn spawn_enemy(&mut self, position: [f32; 2]) -> EntityId {
         let enemy = self.spawn_entity();
+
         self.enemies.push(enemy);
         self.transforms.push((enemy, Transform { position }));
         self.sprites.push((
@@ -86,6 +90,14 @@ impl Scene {
         ));
         self.circle_colliders
             .push((enemy, CircleCollider { radius: 0.35 }));
+        self.health.push((
+            enemy,
+            Health {
+                current: 20.0,
+                max: 20.0,
+            },
+        ));
+
         enemy
     }
 
@@ -110,6 +122,7 @@ impl Scene {
         ));
         self.circle_colliders
             .push((projectile, CircleCollider { radius: 0.15 }));
+        self.damage.push((projectile, Damage { amount: 10.0 }));
 
         projectile
     }
@@ -161,6 +174,18 @@ impl Scene {
             .iter_mut()
             .find_map(|(id, collider)| (*id == entity).then_some(collider))
     }
+
+    pub fn damage(&self, entity: EntityId) -> Option<&Damage> {
+        self.damage
+            .iter()
+            .find_map(|(id, damage)| (*id == entity).then_some(damage))
+    }
+
+    pub fn damage_mut(&mut self, entity: EntityId) -> Option<&mut Damage> {
+        self.damage
+            .iter_mut()
+            .find_map(|(id, damage)| (*id == entity).then_some(damage))
+    }
 }
 
 #[cfg(test)]
@@ -180,6 +205,7 @@ mod tests {
         scene
             .circle_colliders
             .retain(|(entity, _)| *entity == scene.player);
+        scene.damage.clear();
 
         scene
     }
@@ -216,6 +242,13 @@ mod tests {
             scene.circle_collider(enemy).unwrap(),
             &CircleCollider { radius: 0.35 }
         );
+        assert_eq!(
+            scene.health(enemy).unwrap(),
+            &Health {
+                current: 10.0,
+                max: 10.0,
+            }
+        );
     }
 
     #[test]
@@ -250,6 +283,7 @@ mod tests {
             scene.circle_collider(projectile).unwrap(),
             &CircleCollider { radius: 0.15 }
         );
+        assert_eq!(scene.damage(projectile).unwrap(), &Damage { amount: 10.0 });
     }
 
     #[test]
@@ -265,11 +299,13 @@ mod tests {
         assert!(scene.transform(enemy).is_none());
         assert!(scene.sprite(enemy).is_none());
         assert!(scene.circle_collider(enemy).is_none());
+        assert!(scene.health(enemy).is_none());
         assert!(!scene.enemies.contains(&enemy));
 
         assert!(scene.transform(projectile).is_none());
         assert!(scene.sprite(projectile).is_none());
         assert!(scene.circle_collider(projectile).is_none());
+        assert!(scene.damage(projectile).is_none());
         assert!(
             !scene
                 .projectiles
@@ -279,16 +315,19 @@ mod tests {
     }
 
     #[test]
-    fn test_mut_helpers_update_sprite_and_circle_collider_components() {
+    fn test_mut_helpers_update_sprite_circle_collider_and_damage_components() {
         let mut scene = scene_with_only_player();
+        let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0]);
 
         scene.sprite_mut(scene.player).unwrap().size = [2.0, 2.0];
         scene.circle_collider_mut(scene.player).unwrap().radius = 0.5;
+        scene.damage_mut(projectile).unwrap().amount = 5.0;
 
         assert_eq!(scene.sprite(scene.player).unwrap().size, [2.0, 2.0]);
         assert_eq!(
             scene.circle_collider(scene.player).unwrap(),
             &CircleCollider { radius: 0.5 }
         );
+        assert_eq!(scene.damage(projectile).unwrap(), &Damage { amount: 5.0 });
     }
 }

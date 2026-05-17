@@ -26,3 +26,8 @@ pub struct Projectile {
 pub struct CircleCollider {
     pub radius: f32,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Damage {
+    pub amount: f32,
+}

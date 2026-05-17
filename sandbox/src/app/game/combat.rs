@@ -69,8 +69,7 @@ impl CombatState {
     }
 
     fn resolve_projectile_hits(&mut self, scene: &mut Scene) {
-        let mut hit_enemies = Vec::new();
-        let mut hit_projectiles = Vec::new();
+        let mut hits = Vec::new();
 
         for (projectile_entity, projectile) in &scene.projectiles {
             let Some(projectile_position) = scene.transform(*projectile_entity).map(|t| t.position)
@@ -102,25 +101,46 @@ impl CombatState {
                 );
 
                 if distance < hit_radius {
-                    hit_enemies.push(enemy);
-                    hit_projectiles.push(*projectile_entity);
+                    let Some(damage) = scene.damage(*projectile_entity) else {
+                        continue;
+                    };
+
+                    hits.push((enemy, *projectile_entity, damage.amount));
                     break;
                 }
             }
         }
 
-        hit_enemies.sort_unstable_by_key(|entity| entity.0);
-        hit_enemies.dedup();
+        hits.sort_unstable_by_key(|(_, projectile, _)| projectile.0);
+        hits.dedup_by_key(|(_, projectile, _)| projectile.0);
 
-        hit_projectiles.sort_unstable_by_key(|entity| entity.0);
+        let mut defeated_enemies = Vec::new();
+        let mut hit_projectiles = Vec::new();
+
+        for (enemy, projectile, damage) in hits {
+            if let Some(health) = scene.health_mut(enemy) {
+                health.current = (health.current - damage).max(0.0);
+
+                if health.current == 0.0 {
+                    defeated_enemies.push(enemy);
+                }
+            }
+
+            hit_projectiles.push(projectile);
+        }
+
+        defeated_enemies.sort_unstable_by_key(|enemy| enemy.0);
+        defeated_enemies.dedup();
+
+        hit_projectiles.sort_unstable_by_key(|projectile| projectile.0);
         hit_projectiles.dedup();
 
-        for enemy in hit_enemies {
+        for enemy in defeated_enemies {
             scene.despawn_entity(enemy);
         }
 
-        for projectile_entity in hit_projectiles {
-            scene.despawn_entity(projectile_entity);
+        for projectile in hit_projectiles {
+            scene.despawn_entity(projectile);
         }
     }
 }
@@ -184,6 +204,7 @@ mod tests {
         scene
             .circle_colliders
             .retain(|(entity, _)| *entity == scene.player);
+        scene.damage.clear();
 
         scene
     }
@@ -236,6 +257,35 @@ mod tests {
         assert!(scene.enemies.contains(&enemy));
         assert!(
             scene
+                .projectiles
+                .iter()
+                .any(|(entity, _)| *entity == projectile_entity)
+        );
+    }
+
+    #[test]
+    fn test_projectile_hit_damages_enemy_without_despawning_nonlethal_enemy() {
+        let mut scene = scene_with_only_player();
+
+        let enemy = scene.spawn_enemy([1.0, 0.0]);
+        let projectile_entity = scene.spawn_projectile([2.0, 0.0], [1.0, 0.0]);
+
+        scene
+            .projectiles
+            .iter_mut()
+            .find_map(|(entity, projectile)| (*entity == projectile_entity).then_some(projectile))
+            .unwrap()
+            .previous_position = [0.0, 0.0];
+        scene.damage_mut(projectile_entity).unwrap().amount = 5.0;
+
+        let mut combat = CombatState::default();
+
+        combat.resolve_projectile_hits(&mut scene);
+
+        assert!(scene.enemies.contains(&enemy));
+        assert_eq!(scene.health(enemy).unwrap().current, 5.0);
+        assert!(
+            !scene
                 .projectiles
                 .iter()
                 .any(|(entity, _)| *entity == projectile_entity)
