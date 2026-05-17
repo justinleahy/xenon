@@ -16,6 +16,14 @@ pub fn build_render_sprites(state: &SandboxState) -> Vec<RenderSprite> {
         });
     }
 
+    for projectile in &state.projectiles {
+        sprites.push(RenderSprite {
+            position: projectile.position,
+            size: [0.25, 0.25],
+            color: [0.35, 0.75, 1.0, 1.0],
+        });
+    }
+
     append_health_bar_sprites(&mut sprites, state);
 
     sprites.push(RenderSprite {
