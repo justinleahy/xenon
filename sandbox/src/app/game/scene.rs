@@ -8,7 +8,7 @@ use super::{
     components::{
         CircleCollider, Damage, DeathDrop, Health, Pickup, Projectile, Sprite, Transform,
     },
-    entity::EntityId,
+    entity::{EntityId, SceneObjectId},
 };
 
 pub struct Scene {
@@ -24,6 +24,7 @@ pub struct Scene {
     pub death_drops: Vec<(EntityId, DeathDrop)>,
     pub pickups: Vec<(EntityId, Pickup)>,
     pub enemy_components: Vec<(EntityId, Enemy)>,
+    pub scene_object_ids: Vec<(EntityId, SceneObjectId)>,
 }
 
 impl Scene {
@@ -41,6 +42,7 @@ impl Scene {
             death_drops: Vec::new(),
             pickups: Vec::new(),
             enemy_components: Vec::new(),
+            scene_object_ids: Vec::new(),
         };
 
         let player = scene.spawn_entity();
@@ -89,6 +91,7 @@ impl Scene {
         self.death_drops.retain(|(id, _)| *id != entity);
         self.pickups.retain(|(id, _)| *id != entity);
         self.enemy_components.retain(|(id, _)| *id != entity);
+        self.scene_object_ids.retain(|(id, _)| *id != entity);
     }
 
     pub fn spawn_enemy(
@@ -268,6 +271,25 @@ impl Scene {
             .iter()
             .find_map(|(id, enemy)| (*id == entity).then_some(enemy))
     }
+
+    pub fn scene_object_id(&self, entity: EntityId) -> Option<&SceneObjectId> {
+        self.scene_object_ids
+            .iter()
+            .find_map(|(id, scene_object_id)| (*id == entity).then_some(scene_object_id))
+    }
+
+    pub fn set_scene_object_id(&mut self, entity: EntityId, scene_object_id: SceneObjectId) {
+        if let Some((_, existing_id)) = self
+            .scene_object_ids
+            .iter_mut()
+            .find(|(id, _)| *id == entity)
+        {
+            *existing_id = scene_object_id;
+            return;
+        }
+
+        self.scene_object_ids.push((entity, scene_object_id));
+    }
 }
 
 #[cfg(test)]
@@ -323,6 +345,20 @@ mod tests {
                 reward: PickupReward::Experience(1),
             }
         );
+    }
+
+    #[test]
+    fn test_scene_object_id_can_be_assigned_and_replaced() {
+        let mut scene = scene_with_only_player();
+
+        scene.set_scene_object_id(scene.player, SceneObjectId::new("player"));
+        scene.set_scene_object_id(scene.player, SceneObjectId::new("player.updated"));
+
+        assert_eq!(
+            scene.scene_object_id(scene.player),
+            Some(&SceneObjectId::new("player.updated"))
+        );
+        assert_eq!(scene.scene_object_ids.len(), 1);
     }
 
     #[test]
@@ -397,6 +433,7 @@ mod tests {
         let enemy = scene.spawn_enemy([3.0, 4.0], EnemyKind::Basic, &catalog);
         let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0], weapon);
         let pickup = scene.spawn_pickup([2.0, 3.0], PickupReward::Experience(7));
+        scene.set_scene_object_id(enemy, SceneObjectId::new("enemy.test"));
 
         scene.despawn_entity(enemy);
         scene.despawn_entity(projectile);
@@ -408,6 +445,7 @@ mod tests {
         assert!(scene.health(enemy).is_none());
         assert!(scene.death_drop(enemy).is_none());
         assert!(scene.enemy(enemy).is_none());
+        assert!(scene.scene_object_id(enemy).is_none());
         assert!(!scene.enemies.contains(&enemy));
 
         assert!(scene.transform(projectile).is_none());

@@ -1,4 +1,4 @@
-use super::{EnemyKind, GameCatalog, Scene};
+use super::{EnemyKind, GameCatalog, Scene, SceneObjectId};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -14,8 +14,9 @@ pub struct PlayerSceneDefinition {
     pub position: [f32; 2],
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EnemySpawnDefinition {
+    pub id: SceneObjectId,
     pub kind: EnemyKind,
     pub position: [f32; 2],
 }
@@ -27,6 +28,7 @@ impl SceneDefinition {
                 position: [0.0, 0.0],
             },
             enemies: vec![EnemySpawnDefinition {
+                id: SceneObjectId::new("enemy.starting_basic"),
                 kind: EnemyKind::Basic,
                 position: [5.0, 5.0],
             }],
@@ -56,7 +58,8 @@ impl SceneDefinition {
         }
 
         for enemy in &self.enemies {
-            scene.spawn_enemy(enemy.position, enemy.kind, catalog);
+            let entity = scene.spawn_enemy(enemy.position, enemy.kind, catalog);
+            scene.set_scene_object_id(entity, enemy.id.clone());
         }
 
         scene
@@ -76,6 +79,10 @@ impl SceneDefinition {
                 let transform = scene.transform(*entity)?;
 
                 Some(EnemySpawnDefinition {
+                    id: scene
+                        .scene_object_id(*entity)
+                        .cloned()
+                        .unwrap_or_else(|| SceneObjectId::new(format!("enemy.{}", entity.0))),
                     kind: enemy.kind,
                     position: transform.position,
                 })
@@ -123,6 +130,7 @@ mod tests {
 position = [1.0, 2.0]
 
 [[enemies]]
+id = "enemy.test_basic"
 kind = "basic"
 position = [3.0, 4.0]
             "#,
@@ -135,6 +143,7 @@ position = [3.0, 4.0]
         assert_eq!(
             definition.enemies,
             vec![EnemySpawnDefinition {
+                id: SceneObjectId::new("enemy.test_basic"),
                 kind: EnemyKind::Basic,
                 position: [3.0, 4.0],
             }]
@@ -161,6 +170,7 @@ position = [3.0, 4.0]
                 position: [2.0, -1.0],
             },
             enemies: vec![EnemySpawnDefinition {
+                id: SceneObjectId::new("enemy.test_basic"),
                 kind: EnemyKind::Basic,
                 position: [4.0, 5.0],
             }],
@@ -181,6 +191,10 @@ position = [3.0, 4.0]
             scene.enemy(*scene.enemies.first().unwrap()).unwrap().kind,
             EnemyKind::Basic
         );
+        assert_eq!(
+            scene.scene_object_id(*scene.enemies.first().unwrap()),
+            Some(&SceneObjectId::new("enemy.test_basic"))
+        );
     }
 
     #[test]
@@ -197,6 +211,10 @@ position = [3.0, 4.0]
             EnemyKind::Basic
         );
         assert_eq!(
+            scene.scene_object_id(*scene.enemies.first().unwrap()),
+            Some(&SceneObjectId::new("enemy.starting_basic"))
+        );
+        assert_eq!(
             scene
                 .transform(*scene.enemies.first().unwrap())
                 .unwrap()
@@ -211,7 +229,8 @@ position = [3.0, 4.0]
         let mut scene = Scene::empty();
 
         scene.transform_mut(scene.player).unwrap().position = [2.0, -1.0];
-        scene.spawn_enemy([4.0, 5.0], EnemyKind::Basic, &catalog);
+        let enemy = scene.spawn_enemy([4.0, 5.0], EnemyKind::Basic, &catalog);
+        scene.set_scene_object_id(enemy, SceneObjectId::new("enemy.saved_basic"));
 
         let definition = SceneDefinition::from_scene(&scene);
 
@@ -222,6 +241,7 @@ position = [3.0, 4.0]
                     position: [2.0, -1.0],
                 },
                 enemies: vec![EnemySpawnDefinition {
+                    id: SceneObjectId::new("enemy.saved_basic"),
                     kind: EnemyKind::Basic,
                     position: [4.0, 5.0],
                 }],

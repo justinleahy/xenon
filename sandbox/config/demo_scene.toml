@@ -2,5 +2,6 @@
 position = [0.0, 0.0]
 
 [[enemies]]
+id = "enemy.starting_basic"
 kind = "basic"
 position = [5.0, 5.0]

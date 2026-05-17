@@ -14,6 +14,7 @@ pub mod test_helpers;
 pub use catalog::{EnemyKind, GameCatalog, WeaponKind};
 pub use combat::CombatState;
 pub use enemies::EnemyState;
+pub use entity::SceneObjectId;
 pub use player::{PlayerController, PlayerProgression};
 pub use scene::Scene;
 pub use scene_definition::{EnemySpawnDefinition, PlayerSceneDefinition, SceneDefinition};

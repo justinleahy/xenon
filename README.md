@@ -21,6 +21,7 @@ Implemented so far:
 - Basic entity IDs, component storage, and scheduled gameplay systems.
 - Data-driven rendering through `Transform` and `Sprite` components.
 - Demo scene loading from `sandbox/config/demo_scene.toml`.
+- Stable scene-object IDs for serialized scene enemies.
 - Circle-collider based projectile hits and enemy contact damage.
 - Enemy health, projectile damage, death drops, pickups, and player experience collection.
 - Sandbox gameplay loop with player movement, enemy spawning/chasing, automatic projectile firing, pickup collection, and reset.

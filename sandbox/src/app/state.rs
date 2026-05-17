@@ -104,7 +104,7 @@ impl SandboxState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::game::{EnemyKind, EnemySpawnDefinition, PlayerSceneDefinition};
+    use crate::app::game::{EnemyKind, EnemySpawnDefinition, PlayerSceneDefinition, SceneObjectId};
 
     #[test]
     fn test_reset_restores_initial_scene_definition() {
@@ -114,6 +114,7 @@ mod tests {
                 position: [3.0, 4.0],
             },
             enemies: vec![EnemySpawnDefinition {
+                id: SceneObjectId::new("enemy.reset_basic"),
                 kind: EnemyKind::Basic,
                 position: [6.0, 7.0],
             }],
@@ -138,6 +139,12 @@ mod tests {
                 .unwrap()
                 .position,
             [6.0, 7.0]
+        );
+        assert_eq!(
+            state
+                .scene
+                .scene_object_id(*state.scene.enemies.first().unwrap()),
+            Some(&SceneObjectId::new("enemy.reset_basic"))
         );
     }
 }
