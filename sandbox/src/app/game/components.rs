@@ -8,3 +8,9 @@ pub struct Health {
     pub current: f32,
     pub max: f32,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Sprite {
+    pub size: [f32; 2],
+    pub color: [f32; 4],
+}

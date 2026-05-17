@@ -8,15 +8,14 @@ pub fn build_render_sprites(state: &SandboxState) -> Vec<RenderSprite> {
 
     append_grid_sprites(&mut sprites, state.player_position(), 20);
 
-    for enemy in &state.scene.enemies {
-        let Some(transform) = state.scene.transform(*enemy) else {
+    for (entity, transform) in &state.scene.transforms {
+        let Some(sprite) = state.scene.sprite(*entity) else {
             continue;
         };
-
         sprites.push(RenderSprite {
             position: transform.position,
-            size: [1.0, 1.0],
-            color: [0.9, 0.35, 0.55, 1.0],
+            size: sprite.size,
+            color: sprite.color,
         });
     }
 
@@ -29,12 +28,6 @@ pub fn build_render_sprites(state: &SandboxState) -> Vec<RenderSprite> {
     }
 
     append_health_bar_sprites(&mut sprites, state);
-
-    sprites.push(RenderSprite {
-        position: state.player_position(),
-        size: [1.0, 1.0],
-        color: [0.95, 0.9, 0.55, 1.0],
-    });
 
     sprites
 }

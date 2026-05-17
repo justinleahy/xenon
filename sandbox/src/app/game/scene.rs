@@ -1,5 +1,5 @@
 use super::{
-    components::{Health, Transform},
+    components::{Health, Sprite, Transform},
     entity::EntityId,
 };
 
@@ -9,6 +9,7 @@ pub struct Scene {
     pub transforms: Vec<(EntityId, Transform)>,
     pub health: Vec<(EntityId, Health)>,
     pub enemies: Vec<EntityId>,
+    pub sprites: Vec<(EntityId, Sprite)>,
 }
 
 impl Scene {
@@ -19,6 +20,7 @@ impl Scene {
             transforms: Vec::new(),
             health: Vec::new(),
             enemies: Vec::new(),
+            sprites: Vec::new(),
         };
 
         let player = scene.spawn_entity();
@@ -27,6 +29,13 @@ impl Scene {
             player,
             Transform {
                 position: [0.0, 0.0],
+            },
+        ));
+        scene.sprites.push((
+            player,
+            Sprite {
+                size: [1.0, 1.0],
+                color: [0.95, 0.9, 0.55, 1.0],
             },
         ));
         scene.health.push((
@@ -52,6 +61,13 @@ impl Scene {
         let enemy = self.spawn_entity();
         self.enemies.push(enemy);
         self.transforms.push((enemy, Transform { position }));
+        self.sprites.push((
+            enemy,
+            Sprite {
+                size: [1.0, 1.0],
+                color: [0.9, 0.35, 0.55, 1.0],
+            },
+        ));
         enemy
     }
 
@@ -59,6 +75,7 @@ impl Scene {
         self.transforms.retain(|(id, _)| *id != entity);
         self.health.retain(|(id, _)| *id != entity);
         self.enemies.retain(|id| *id != entity);
+        self.sprites.retain(|(id, _)| *id != entity);
     }
 
     pub fn transform(&self, entity: EntityId) -> Option<&Transform> {
@@ -83,5 +100,18 @@ impl Scene {
         self.health
             .iter_mut()
             .find_map(|(id, health)| (*id == entity).then_some(health))
+    }
+
+    pub fn sprite(&self, entity: EntityId) -> Option<&Sprite> {
+        self.sprites
+            .iter()
+            .find_map(|(id, sprite)| (*id == entity).then_some(sprite))
+    }
+
+    #[allow(dead_code)]
+    pub fn sprite_mut(&mut self, entity: EntityId) -> Option<&mut Sprite> {
+        self.sprites
+            .iter_mut()
+            .find_map(|(id, sprite)| (*id == entity).then_some(sprite))
     }
 }
