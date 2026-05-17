@@ -109,6 +109,10 @@ mod tests {
         std::env::temp_dir().join(format!("xenon-scene-{name}-{nanos}.toml"))
     }
 
+    fn demo_scene_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/demo_scene.toml")
+    }
+
     #[test]
     fn test_load_from_file_loads_scene_definition() {
         let path = temp_scene_path("load");
@@ -176,6 +180,28 @@ position = [3.0, 4.0]
         assert_eq!(
             scene.enemy(*scene.enemies.first().unwrap()).unwrap().kind,
             EnemyKind::Basic
+        );
+    }
+
+    #[test]
+    fn test_load_demo_scene_file_builds_expected_scene() {
+        let catalog = GameCatalog::default();
+        let definition = SceneDefinition::load_from_file(demo_scene_path()).unwrap();
+
+        let scene = definition.build_scene(&catalog);
+
+        assert_eq!(scene.transform(scene.player).unwrap().position, [0.0, 0.0]);
+        assert_eq!(scene.enemies.len(), 1);
+        assert_eq!(
+            scene.enemy(*scene.enemies.first().unwrap()).unwrap().kind,
+            EnemyKind::Basic
+        );
+        assert_eq!(
+            scene
+                .transform(*scene.enemies.first().unwrap())
+                .unwrap()
+                .position,
+            [5.0, 5.0]
         );
     }
 

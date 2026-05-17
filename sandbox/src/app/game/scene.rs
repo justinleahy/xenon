@@ -72,14 +72,6 @@ impl Scene {
         scene
     }
 
-    pub fn new_survivor_demo(catalog: &GameCatalog) -> Self {
-        let mut scene = Self::empty();
-
-        scene.spawn_enemy([5.0, 5.0], EnemyKind::Basic, catalog);
-
-        scene
-    }
-
     pub fn spawn_entity(&mut self) -> EntityId {
         let entity = EntityId(self.next_entity_id);
         self.next_entity_id += 1;
@@ -294,18 +286,6 @@ mod tests {
         assert_eq!(
             scene.circle_collider(scene.player).unwrap(),
             &CircleCollider { radius: 0.35 }
-        );
-    }
-
-    #[test]
-    fn test_new_survivor_demo_spawns_demo_enemy() {
-        let catalog = GameCatalog::default();
-        let scene = Scene::new_survivor_demo(&catalog);
-
-        assert_eq!(scene.enemies.len(), 1);
-        assert_eq!(
-            scene.enemy(*scene.enemies.first().unwrap()).unwrap().kind,
-            EnemyKind::Basic
         );
     }
 
