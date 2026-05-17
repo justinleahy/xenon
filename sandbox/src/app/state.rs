@@ -20,6 +20,7 @@ pub struct SandboxState {
     pub player_health: f32,
     pub projectiles: Vec<Projectile>,
     pub weapon_cooldown_secs: f32,
+    pub enemy_spawn_cooldown_secs: f32,
 }
 
 impl Default for SandboxState {
@@ -34,6 +35,7 @@ impl Default for SandboxState {
             player_health: 100.0,
             projectiles: Vec::new(),
             weapon_cooldown_secs: 0.0,
+            enemy_spawn_cooldown_secs: 1.5,
         }
     }
 }
@@ -79,6 +81,8 @@ impl SandboxState {
 
         self.player_position[0] += direction[0] * player_speed * delta_secs;
         self.player_position[1] += direction[1] * player_speed * delta_secs;
+
+        self.update_enemy_spawning(delta_secs);
 
         for enemy in &mut self.enemies {
             let to_player = [
@@ -231,6 +235,36 @@ impl SandboxState {
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|enemy| enemy.position)
+    }
+
+    fn update_enemy_spawning(&mut self, delta_secs: f32) {
+        const MAX_ENEMIES: usize = 50;
+
+        if self.enemies.len() >= MAX_ENEMIES {
+            return;
+        }
+
+        self.enemy_spawn_cooldown_secs -= delta_secs;
+
+        if self.enemy_spawn_cooldown_secs > 0.0 {
+            return;
+        }
+
+        let spawn_radius = 12.0;
+        let spawn_index = self.fixed_updates as f32;
+
+        let angle = spawn_index * 2.3999631; // Golden angle, spreads spawn around ring
+
+        let spawn_position = [
+            self.player_position[0] + spawn_radius * angle.cos(),
+            self.player_position[1] + spawn_radius * angle.sin(),
+        ];
+
+        self.enemies.push(Enemy {
+            position: spawn_position,
+        });
+
+        self.enemy_spawn_cooldown_secs = 1.5;
     }
 }
 
