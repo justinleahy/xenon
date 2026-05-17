@@ -19,9 +19,14 @@ pub fn build_render_sprites(state: &SandboxState) -> Vec<RenderSprite> {
         });
     }
 
-    for projectile in &state.combat_state.projectiles {
+    for projectile in &state.scene.projectiles {
+        let Some(projectile_position) = state.scene.transform(projectile.0).map(|t| t.position)
+        else {
+            continue;
+        };
+
         sprites.push(RenderSprite {
-            position: projectile.position,
+            position: projectile_position,
             size: [0.25, 0.25],
             color: [0.35, 0.75, 1.0, 1.0],
         });

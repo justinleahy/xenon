@@ -1,22 +1,14 @@
 use super::Scene;
 
-pub struct Projectile {
-    pub position: [f32; 2],
-    pub previous_position: [f32; 2],
-    pub velocity: [f32; 2],
-    pub lifetime_secs: f32,
-}
-
 #[derive(Default)]
 pub struct CombatState {
-    pub projectiles: Vec<Projectile>,
     pub weapon_cooldown_secs: f32,
 }
 
 impl CombatState {
     pub fn fixed_update(&mut self, scene: &mut Scene, player_position: [f32; 2], delta_secs: f32) {
         self.update_weapon(scene, player_position, delta_secs);
-        self.update_projectiles(delta_secs);
+        self.update_projectiles(scene, delta_secs);
         self.resolve_projectile_hits(scene);
     }
 
@@ -45,37 +37,49 @@ impl CombatState {
         let projectile_speed = 8.0;
         let direction = [to_target[0] / distance, to_target[1] / distance];
 
-        self.projectiles.push(Projectile {
-            position: player_position,
-            previous_position: player_position,
-            velocity: [
+        scene.spawn_projectile(
+            player_position,
+            [
                 direction[0] * projectile_speed,
                 direction[1] * projectile_speed,
             ],
-            lifetime_secs: 2.0,
-        });
+        );
 
         self.weapon_cooldown_secs = 0.5;
     }
 
-    fn update_projectiles(&mut self, delta_secs: f32) {
-        for projectile in &mut self.projectiles {
-            projectile.previous_position = projectile.position;
-            projectile.position[0] += projectile.velocity[0] * delta_secs;
-            projectile.position[1] += projectile.velocity[1] * delta_secs;
+    fn update_projectiles(&mut self, scene: &mut Scene, delta_secs: f32) {
+        let transforms = &mut scene.transforms;
+
+        for (entity, projectile) in &mut scene.projectiles {
+            let entity = *entity;
+
+            let Some(transform) = transforms
+                .iter_mut()
+                .find_map(|(id, transform)| (*id == entity).then_some(transform))
+            else {
+                continue;
+            };
+
+            projectile.previous_position = transform.position;
+            transform.position[0] += projectile.velocity[0] * delta_secs;
+            transform.position[1] += projectile.velocity[1] * delta_secs;
             projectile.lifetime_secs -= delta_secs;
         }
-
-        self.projectiles.retain(|p| p.lifetime_secs > 0.0);
     }
 
     fn resolve_projectile_hits(&mut self, scene: &mut Scene) {
         let hit_radius = 0.30;
 
         let mut hit_enemies = Vec::new();
-        let mut hit_projectile_indices = Vec::new();
+        let mut hit_projectiles = Vec::new();
 
-        for (projectile_index, projectile) in self.projectiles.iter().enumerate() {
+        for (projectile_entity, projectile) in &scene.projectiles {
+            let Some(projectile_position) = scene.transform(*projectile_entity).map(|t| t.position)
+            else {
+                continue;
+            };
+
             for enemy in &scene.enemies {
                 let enemy = *enemy;
 
@@ -86,12 +90,12 @@ impl CombatState {
                 let distance = distance_point_to_segment(
                     enemy_position,
                     projectile.previous_position,
-                    projectile.position,
+                    projectile_position,
                 );
 
                 if distance < hit_radius {
                     hit_enemies.push(enemy);
-                    hit_projectile_indices.push(projectile_index);
+                    hit_projectiles.push(*projectile_entity);
                     break;
                 }
             }
@@ -100,21 +104,16 @@ impl CombatState {
         hit_enemies.sort_unstable_by_key(|entity| entity.0);
         hit_enemies.dedup();
 
-        hit_projectile_indices.sort_unstable();
-        hit_projectile_indices.dedup();
+        hit_projectiles.sort_unstable_by_key(|entity| entity.0);
+        hit_projectiles.dedup();
 
         for enemy in hit_enemies {
             scene.despawn_entity(enemy);
         }
 
-        let mut projectile_index = 0;
-        self.projectiles.retain(|_| {
-            let keep = hit_projectile_indices
-                .binary_search(&projectile_index)
-                .is_err();
-            projectile_index += 1;
-            keep
-        });
+        for projectile_entity in hit_projectiles {
+            scene.despawn_entity(projectile_entity);
+        }
     }
 }
 
@@ -181,21 +180,26 @@ mod tests {
         let mut scene = scene_with_only_player();
 
         let enemy = scene.spawn_enemy([1.0, 0.0]);
+        let projectile_entity = scene.spawn_projectile([2.0, 0.0], [1.0, 0.0]);
 
-        let mut combat = CombatState {
-            projectiles: vec![Projectile {
-                position: [2.0, 0.0],
-                previous_position: [0.0, 0.0],
-                velocity: [1.0, 0.0],
-                lifetime_secs: 1.0,
-            }],
-            weapon_cooldown_secs: 0.0,
-        };
+        scene
+            .projectiles
+            .iter_mut()
+            .find_map(|(entity, projectile)| (*entity == projectile_entity).then_some(projectile))
+            .unwrap()
+            .previous_position = [0.0, 0.0];
+
+        let mut combat = CombatState::default();
 
         combat.resolve_projectile_hits(&mut scene);
 
         assert!(!scene.enemies.contains(&enemy));
-        assert!(combat.projectiles.is_empty());
+        assert!(
+            !scene
+                .projectiles
+                .iter()
+                .any(|(entity, _)| *entity == projectile_entity)
+        );
     }
 
     #[test]
@@ -203,21 +207,26 @@ mod tests {
         let mut scene = scene_with_only_player();
 
         let enemy = scene.spawn_enemy([1.0, 1.0]);
+        let projectile_entity = scene.spawn_projectile([2.0, 0.0], [1.0, 0.0]);
 
-        let mut combat = CombatState {
-            projectiles: vec![Projectile {
-                position: [2.0, 0.0],
-                previous_position: [0.0, 0.0],
-                velocity: [1.0, 0.0],
-                lifetime_secs: 1.0,
-            }],
-            weapon_cooldown_secs: 0.0,
-        };
+        scene
+            .projectiles
+            .iter_mut()
+            .find_map(|(entity, projectile)| (*entity == projectile_entity).then_some(projectile))
+            .unwrap()
+            .previous_position = [0.0, 0.0];
+
+        let mut combat = CombatState::default();
 
         combat.resolve_projectile_hits(&mut scene);
 
         assert!(scene.enemies.contains(&enemy));
-        assert_eq!(combat.projectiles.len(), 1);
+        assert!(
+            scene
+                .projectiles
+                .iter()
+                .any(|(entity, _)| *entity == projectile_entity)
+        );
     }
 
     #[test]
@@ -229,7 +238,7 @@ mod tests {
 
         combat.fixed_update(&mut scene, [0.0, 0.0], 0.0);
 
-        assert_eq!(combat.projectiles.len(), 1);
+        assert_eq!(scene.projectiles.len(), 1);
         assert_eq!(combat.weapon_cooldown_secs, 0.5);
     }
 }

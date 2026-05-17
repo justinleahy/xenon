@@ -65,7 +65,7 @@ impl SandboxState {
 
             info!(
                 enemies = self.scene.enemies.len(),
-                projectiles = self.combat_state.projectiles.len(),
+                projectiles = self.scene.projectiles.len(),
                 health = self.player_health(),
                 "scene state"
             )

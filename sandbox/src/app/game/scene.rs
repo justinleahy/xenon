@@ -1,5 +1,5 @@
 use super::{
-    components::{Health, Sprite, Transform},
+    components::{Health, Projectile, Sprite, Transform},
     entity::EntityId,
 };
 
@@ -10,6 +10,7 @@ pub struct Scene {
     pub health: Vec<(EntityId, Health)>,
     pub enemies: Vec<EntityId>,
     pub sprites: Vec<(EntityId, Sprite)>,
+    pub projectiles: Vec<(EntityId, Projectile)>,
 }
 
 impl Scene {
@@ -21,6 +22,7 @@ impl Scene {
             health: Vec::new(),
             enemies: Vec::new(),
             sprites: Vec::new(),
+            projectiles: Vec::new(),
         };
 
         let player = scene.spawn_entity();
@@ -57,6 +59,14 @@ impl Scene {
         entity
     }
 
+    pub fn despawn_entity(&mut self, entity: EntityId) {
+        self.transforms.retain(|(id, _)| *id != entity);
+        self.health.retain(|(id, _)| *id != entity);
+        self.enemies.retain(|id| *id != entity);
+        self.sprites.retain(|(id, _)| *id != entity);
+        self.projectiles.retain(|(id, _)| *id != entity);
+    }
+
     pub fn spawn_enemy(&mut self, position: [f32; 2]) -> EntityId {
         let enemy = self.spawn_entity();
         self.enemies.push(enemy);
@@ -71,11 +81,29 @@ impl Scene {
         enemy
     }
 
-    pub fn despawn_entity(&mut self, entity: EntityId) {
-        self.transforms.retain(|(id, _)| *id != entity);
-        self.health.retain(|(id, _)| *id != entity);
-        self.enemies.retain(|id| *id != entity);
-        self.sprites.retain(|(id, _)| *id != entity);
+    pub fn spawn_projectile(&mut self, position: [f32; 2], velocity: [f32; 2]) -> EntityId {
+        let projectile = self.spawn_entity();
+
+        self.transforms.push((projectile, Transform { position }));
+
+        self.sprites.push((
+            projectile,
+            Sprite {
+                size: [0.25, 0.25],
+                color: [0.35, 0.75, 1.0, 1.0],
+            },
+        ));
+
+        self.projectiles.push((
+            projectile,
+            Projectile {
+                previous_position: position,
+                velocity,
+                lifetime_secs: 2.0,
+            },
+        ));
+
+        projectile
     }
 
     pub fn transform(&self, entity: EntityId) -> Option<&Transform> {
@@ -113,5 +141,104 @@ impl Scene {
         self.sprites
             .iter_mut()
             .find_map(|(id, sprite)| (*id == entity).then_some(sprite))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scene_with_only_player() -> Scene {
+        let mut scene = Scene::new_survivor_demo();
+
+        scene.enemies.clear();
+        scene.projectiles.clear();
+        scene
+            .transforms
+            .retain(|(entity, _)| *entity == scene.player);
+        scene.health.retain(|(entity, _)| *entity == scene.player);
+        scene.sprites.retain(|(entity, _)| *entity == scene.player);
+
+        scene
+    }
+
+    #[test]
+    fn test_new_survivor_demo_creates_valid_player() {
+        let scene = Scene::new_survivor_demo();
+
+        assert!(scene.transform(scene.player).is_some());
+        assert!(scene.sprite(scene.player).is_some());
+        assert!(scene.health(scene.player).is_some());
+    }
+
+    #[test]
+    fn test_spawn_enemy_creates_transform_sprite_and_enemy_tag() {
+        let mut scene = scene_with_only_player();
+
+        let enemy = scene.spawn_enemy([3.0, 4.0]);
+
+        assert!(scene.enemies.contains(&enemy));
+        assert_eq!(scene.transform(enemy).unwrap().position, [3.0, 4.0]);
+        assert_eq!(
+            scene.sprite(enemy).unwrap(),
+            &Sprite {
+                size: [1.0, 1.0],
+                color: [0.9, 0.35, 0.55, 1.0],
+            }
+        );
+    }
+
+    #[test]
+    fn test_spawn_projectile_creates_transform_sprite_and_projectile_component() {
+        let mut scene = scene_with_only_player();
+
+        let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0]);
+
+        assert_eq!(scene.transform(projectile).unwrap().position, [1.0, 2.0]);
+        assert_eq!(
+            scene.sprite(projectile).unwrap(),
+            &Sprite {
+                size: [0.25, 0.25],
+                color: [0.35, 0.75, 1.0, 1.0],
+            }
+        );
+        assert_eq!(
+            scene
+                .projectiles
+                .iter()
+                .find_map(|(entity, projectile_component)| {
+                    (*entity == projectile).then_some(projectile_component)
+                })
+                .unwrap(),
+            &Projectile {
+                previous_position: [1.0, 2.0],
+                velocity: [8.0, 0.0],
+                lifetime_secs: 2.0,
+            }
+        );
+    }
+
+    #[test]
+    fn test_despawn_entity_removes_components_and_tags() {
+        let mut scene = scene_with_only_player();
+
+        let enemy = scene.spawn_enemy([3.0, 4.0]);
+        let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0]);
+
+        scene.despawn_entity(enemy);
+        scene.despawn_entity(projectile);
+
+        assert!(scene.transform(enemy).is_none());
+        assert!(scene.sprite(enemy).is_none());
+        assert!(!scene.enemies.contains(&enemy));
+
+        assert!(scene.transform(projectile).is_none());
+        assert!(scene.sprite(projectile).is_none());
+        assert!(
+            !scene
+                .projectiles
+                .iter()
+                .any(|(entity, _)| *entity == projectile)
+        );
     }
 }
