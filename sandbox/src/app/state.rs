@@ -10,6 +10,7 @@ pub struct SandboxState {
     pub fixed_updates: u64,
     pub player_position: [f32; 2],
     pub enemies: Vec<Enemy>,
+    pub player_health: f32,
 }
 
 impl Default for SandboxState {
@@ -21,6 +22,7 @@ impl Default for SandboxState {
             enemies: vec![Enemy {
                 position: [5.0, 5.0],
             }],
+            player_health: 100.0,
         }
     }
 }
@@ -36,6 +38,7 @@ impl SandboxState {
         }
 
         let enemy_speed = 1.5;
+        let enemy_damage_per_second = 10.0;
         let player_speed = 5.0;
 
         let mut direction = [0.0_f32, 0.0_f32];
@@ -80,6 +83,15 @@ impl SandboxState {
                 enemy.position[0] += direction[0] * enemy_speed * delta_secs;
                 enemy.position[1] += direction[1] * enemy_speed * delta_secs;
             }
+
+            if distance < 0.25 {
+                let previous_health = self.player_health;
+                self.player_health =
+                    (self.player_health - enemy_damage_per_second * delta_secs).max(0.0);
+                if self.player_health == 0.0 && previous_health > 0.0 {
+                    info!("Player health depleted");
+                }
+            }
         }
 
         self.fixed_updates += 1;
@@ -93,6 +105,8 @@ impl SandboxState {
                 player_y = self.player_position[1],
                 "simulation state"
             );
+
+            info!(player_health = self.player_health, "player health")
         }
     }
 }
