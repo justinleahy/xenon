@@ -1,4 +1,4 @@
-use super::game::{CombatState, EnemyState, Scene};
+use super::game::{CombatState, EnemyState, PlayerController, Scene};
 use super::input::InputState;
 use tracing::info;
 
@@ -8,6 +8,7 @@ pub struct SandboxState {
     pub scene: Scene,
     pub combat_state: CombatState,
     pub enemy_state: EnemyState,
+    pub player: PlayerController,
 }
 
 impl Default for SandboxState {
@@ -18,6 +19,7 @@ impl Default for SandboxState {
             scene: Scene::new_survivor_demo(),
             combat_state: CombatState::default(),
             enemy_state: EnemyState::default(),
+            player: PlayerController::default(),
         }
     }
 }
@@ -32,37 +34,10 @@ impl SandboxState {
             return;
         }
 
-        let player_speed = 5.0;
+        let movement = movement_from_input(input);
 
-        let mut direction = [0.0_f32, 0.0_f32];
-
-        if input.move_up {
-            direction[1] -= 1.0;
-        }
-
-        if input.move_down {
-            direction[1] += 1.0;
-        }
-
-        if input.move_left {
-            direction[0] -= 1.0;
-        }
-
-        if input.move_right {
-            direction[0] += 1.0;
-        }
-
-        let length = (direction[0] * direction[0] + direction[1] * direction[1]).sqrt();
-
-        if length > 0.0 {
-            direction[0] /= length;
-            direction[1] /= length;
-        }
-
-        if let Some(transform) = self.scene.transform_mut(self.scene.player) {
-            transform.position[0] += direction[0] * player_speed * delta_secs;
-            transform.position[1] += direction[1] * player_speed * delta_secs;
-        }
+        self.player
+            .fixed_update(&mut self.scene, movement, delta_secs);
 
         let player_position = self.player_position();
 
@@ -110,4 +85,33 @@ impl SandboxState {
             .map(|health| health.current)
             .unwrap_or(0.0)
     }
+}
+
+fn movement_from_input(input: &InputState) -> [f32; 2] {
+    let mut direction = [0.0_f32, 0.0_f32];
+
+    if input.move_up {
+        direction[1] -= 1.0;
+    }
+
+    if input.move_down {
+        direction[1] += 1.0;
+    }
+
+    if input.move_left {
+        direction[0] -= 1.0;
+    }
+
+    if input.move_right {
+        direction[0] += 1.0;
+    }
+
+    let length = (direction[0] * direction[0] + direction[1] * direction[1]).sqrt();
+
+    if length > 0.0 {
+        direction[0] /= length;
+        direction[1] /= length;
+    }
+
+    direction
 }
