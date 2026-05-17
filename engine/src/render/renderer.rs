@@ -7,6 +7,7 @@ pub struct Renderer<'window> {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
+    triangle_pipeline: wgpu::RenderPipeline,
 }
 
 impl<'window> Renderer<'window> {
@@ -37,11 +38,50 @@ impl<'window> Renderer<'window> {
             })
             .await?;
 
-        let config = surface
+        let mut config = surface
             .get_default_config(&adapter, width, height)
             .ok_or(RenderError::UnsupportedSurface)?;
 
+        config.present_mode = wgpu::PresentMode::Fifo;
+
         surface.configure(&device, &config);
+
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Xenon Triangle Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/triangle.wgsl").into()),
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Xenon Triangle Pipeline Layout"),
+            bind_group_layouts: &[],
+            immediate_size: 0,
+        });
+
+        let triangle_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Xenon Triangle Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
 
         Ok(Self {
             _instance: instance,
@@ -50,6 +90,7 @@ impl<'window> Renderer<'window> {
             device,
             queue,
             config,
+            triangle_pipeline,
         })
     }
 
@@ -97,7 +138,7 @@ impl<'window> Renderer<'window> {
             });
 
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Xenon Clear Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -113,6 +154,9 @@ impl<'window> Renderer<'window> {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
+
+            render_pass.set_pipeline(&self.triangle_pipeline);
+            render_pass.draw(0..3, 0..1);
         }
 
         self.queue.submit([encoder.finish()]);
