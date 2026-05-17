@@ -24,19 +24,19 @@ impl Vertex {
 
 const QUAD_VERTICES: &[Vertex] = &[
     Vertex {
-        position: [-0.25, 0.25],
+        position: [-1.0, 1.0],
         color: [0.95, 0.9, 0.55],
     },
     Vertex {
-        position: [-0.25, -0.25],
+        position: [-1.0, -1.0],
         color: [0.35, 0.7, 1.0],
     },
     Vertex {
-        position: [0.25, -0.25],
+        position: [1.0, -1.0],
         color: [0.9, 0.35, 0.45],
     },
     Vertex {
-        position: [0.25, 0.25],
+        position: [1.0, 1.0],
         color: [0.45, 0.95, 0.65],
     },
 ];
@@ -47,7 +47,7 @@ const QUAD_INDICES: &[u16] = &[0, 1, 2, 0, 2, 3];
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct SceneUniform {
     translation: [f32; 2],
-    _padding: [f32; 2],
+    scale: [f32; 2],
 }
 
 impl SceneUniform {
@@ -60,7 +60,7 @@ impl SceneUniform {
                 scene.player_position[0] / (width * 0.5),
                 -scene.player_position[1] / (height * 0.5),
             ],
-            _padding: [0.0, 0.0],
+            scale: [scene.player_size[0] / width, scene.player_size[1] / height],
         }
     }
 }
@@ -123,7 +123,7 @@ impl<'window> Renderer<'window> {
 
         let scene_uniform = SceneUniform {
             translation: [0.0, 0.0],
-            _padding: [0.0, 0.0],
+            scale: [32.0 / width.max(1) as f32, 32.0 / height.max(1) as f32],
         };
 
         let scene_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

@@ -126,6 +126,7 @@ impl SandboxApp {
                 self.config.clear_color,
                 RenderScene {
                     player_position: self.state.player_position,
+                    player_size: [32.0, 32.0],
                 },
             )
             .expect("failed to render frame");

@@ -1,5 +1,6 @@
 struct SceneUniform {
     translation: vec2<f32>,
+    scale: vec2<f32>,
 }
 
 @group(0) @binding(0)
@@ -19,7 +20,9 @@ struct VertexOutput {
 fn vs_main(input: VertexInput) -> VertexOutput {
     var output: VertexOutput;
 
-    output.position = vec4<f32>(input.position + scene.translation, 0.0, 1.0);
+    let position = input.position * scene.scale + scene.translation;
+
+    output.position = vec4<f32>(position, 0.0, 1.0);
     output.color = input.color;
 
     return output;
