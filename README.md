@@ -18,10 +18,13 @@ Implemented so far:
 - `wgpu` clear pass and instanced 2D quad rendering.
 - Camera-following sprite scene.
 - Debug grid and player health bar.
-- Basic entity IDs, transforms, health, enemies, projectiles, and gameplay systems.
-- Sandbox gameplay loop with player movement, enemy spawning/chasing, automatic projectile firing, projectile hits, and reset.
+- Basic entity IDs, component storage, and gameplay systems.
+- Data-driven rendering through `Transform` and `Sprite` components.
+- Circle-collider based projectile hits and enemy contact damage.
+- Enemy health, projectile damage, death drops, pickups, and player experience collection.
+- Sandbox gameplay loop with player movement, enemy spawning/chasing, automatic projectile firing, pickup collection, and reset.
 
-The project is currently in Phase 3: entity, scene, and gameplay-system structure. The current entity/component model is intentionally small and direct; it is being shaped by the sandbox before committing to a larger ECS abstraction.
+The project is currently in Phase 3: entity, scene, and gameplay-system structure. The current entity/component model is intentionally small and direct; it is being shaped by the sandbox before committing to a larger ECS abstraction or upgrade system.
 
 ## Repository Shape
 
@@ -58,7 +61,7 @@ cargo fmt --check
 cargo test
 ```
 
-The current test suite covers runtime configuration, frame timing, fixed timestep behavior, and focused gameplay-system behavior in the sandbox.
+The current test suite covers runtime configuration, frame timing, fixed timestep behavior, scene/component invariants, render-scene conversion, combat, enemies, player movement, pickups, and player progression.
 
 ## Development Notes
 
