@@ -1,4 +1,6 @@
-use super::game::{CombatState, EnemyState, PlayerController, PlayerProgression, Scene};
+use super::game::{
+    CombatState, EnemyState, GameCatalog, PlayerController, PlayerProgression, Scene,
+};
 use super::input::InputState;
 use tracing::info;
 
@@ -10,18 +12,22 @@ pub struct SandboxState {
     pub enemy_state: EnemyState,
     pub player_controller: PlayerController,
     pub player_progression: PlayerProgression,
+    pub game_catalog: GameCatalog,
 }
 
 impl Default for SandboxState {
     fn default() -> Self {
+        let game_catalog = GameCatalog::default();
+
         Self {
             simulation_time_secs: 0.0,
             fixed_updates: 0,
-            scene: Scene::new_survivor_demo(),
+            scene: Scene::new_survivor_demo(&game_catalog),
             combat_state: CombatState::default(),
             enemy_state: EnemyState::default(),
             player_controller: PlayerController::default(),
             player_progression: PlayerProgression::default(),
+            game_catalog,
         }
     }
 }
@@ -45,13 +51,18 @@ impl SandboxState {
 
         self.enemy_state.fixed_update(
             &mut self.scene,
+            &self.game_catalog,
             player_position,
             self.fixed_updates,
             delta_secs,
         );
 
-        self.combat_state
-            .fixed_update(&mut self.scene, player_position, delta_secs);
+        self.combat_state.fixed_update(
+            &mut self.scene,
+            &self.game_catalog,
+            player_position,
+            delta_secs,
+        );
 
         self.player_progression
             .fixed_update(&mut self.scene, player_position);

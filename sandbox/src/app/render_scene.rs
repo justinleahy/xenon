@@ -190,8 +190,11 @@ mod tests {
     #[test]
     fn test_build_render_sprites_renders_projectiles_from_scene_components_once() {
         let mut state = state_with_empty_scene();
+        let weapon = state
+            .game_catalog
+            .weapon(super::super::game::WeaponKind::Wand);
 
-        state.scene.spawn_projectile([2.0, 3.0], [8.0, 0.0]);
+        state.scene.spawn_projectile([2.0, 3.0], [8.0, 0.0], weapon);
 
         let sprites = build_render_sprites(&state);
 

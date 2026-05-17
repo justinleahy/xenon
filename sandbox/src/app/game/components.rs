@@ -1,3 +1,5 @@
+use super::catalog::EnemyKind;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Transform {
     pub position: [f32; 2],
@@ -45,4 +47,9 @@ pub struct DeathDrop {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Pickup {
     pub reward: PickupReward,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Enemy {
+    pub kind: EnemyKind,
 }

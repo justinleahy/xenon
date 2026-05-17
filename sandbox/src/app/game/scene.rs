@@ -1,4 +1,8 @@
-use crate::app::game::components::PickupReward;
+use crate::app::game::{
+    EnemyKind, GameCatalog,
+    catalog::WeaponDefinition,
+    components::{Enemy, PickupReward},
+};
 
 use super::{
     components::{
@@ -19,10 +23,11 @@ pub struct Scene {
     pub damage: Vec<(EntityId, Damage)>,
     pub death_drops: Vec<(EntityId, DeathDrop)>,
     pub pickups: Vec<(EntityId, Pickup)>,
+    pub enemy_components: Vec<(EntityId, Enemy)>,
 }
 
 impl Scene {
-    pub fn new_survivor_demo() -> Self {
+    pub fn new_survivor_demo(catalog: &GameCatalog) -> Self {
         let mut scene = Self {
             next_entity_id: 0,
             player: EntityId(0),
@@ -35,6 +40,7 @@ impl Scene {
             damage: Vec::new(),
             death_drops: Vec::new(),
             pickups: Vec::new(),
+            enemy_components: Vec::new(),
         };
 
         let player = scene.spawn_entity();
@@ -63,7 +69,7 @@ impl Scene {
             .circle_colliders
             .push((player, CircleCollider { radius: 0.35 }));
 
-        scene.spawn_enemy([5.0, 5.0]);
+        scene.spawn_enemy([5.0, 5.0], EnemyKind::Basic, catalog);
 
         scene
     }
@@ -84,48 +90,65 @@ impl Scene {
         self.damage.retain(|(id, _)| *id != entity);
         self.death_drops.retain(|(id, _)| *id != entity);
         self.pickups.retain(|(id, _)| *id != entity);
+        self.enemy_components.retain(|(id, _)| *id != entity);
     }
 
-    pub fn spawn_enemy(&mut self, position: [f32; 2]) -> EntityId {
+    pub fn spawn_enemy(
+        &mut self,
+        position: [f32; 2],
+        kind: EnemyKind,
+        catalog: &GameCatalog,
+    ) -> EntityId {
+        let definition = catalog.enemy(kind);
         let enemy = self.spawn_entity();
 
         self.enemies.push(enemy);
+        self.enemy_components.push((enemy, Enemy { kind }));
         self.transforms.push((enemy, Transform { position }));
         self.sprites.push((
             enemy,
             Sprite {
-                size: [1.0, 1.0],
-                color: [0.9, 0.35, 0.55, 1.0],
+                size: definition.sprite_size,
+                color: definition.sprite_color,
             },
         ));
-        self.circle_colliders
-            .push((enemy, CircleCollider { radius: 0.35 }));
+        self.circle_colliders.push((
+            enemy,
+            CircleCollider {
+                radius: definition.collider_radius,
+            },
+        ));
         self.health.push((
             enemy,
             Health {
-                current: 20.0,
-                max: 20.0,
+                current: definition.health,
+                max: definition.health,
             },
         ));
         self.death_drops.push((
             enemy,
             DeathDrop {
-                reward: PickupReward::Experience(1),
+                reward: definition.death_reward,
             },
         ));
 
         enemy
     }
 
-    pub fn spawn_projectile(&mut self, position: [f32; 2], velocity: [f32; 2]) -> EntityId {
+    pub fn spawn_projectile(
+        &mut self,
+        position: [f32; 2],
+        velocity: [f32; 2],
+        weapon: &WeaponDefinition,
+    ) -> EntityId {
         let projectile = self.spawn_entity();
 
         self.transforms.push((projectile, Transform { position }));
         self.sprites.push((
             projectile,
             Sprite {
-                size: [0.25, 0.25],
-                color: [0.35, 0.75, 1.0, 1.0],
+                size: weapon.projectile_size,
+                color: weapon.projectile_color,
             },
         ));
         self.projectiles.push((
@@ -133,12 +156,21 @@ impl Scene {
             Projectile {
                 previous_position: position,
                 velocity,
-                lifetime_secs: 2.0,
+                lifetime_secs: weapon.projectile_lifetime_secs,
             },
         ));
-        self.circle_colliders
-            .push((projectile, CircleCollider { radius: 0.15 }));
-        self.damage.push((projectile, Damage { amount: 10.0 }));
+        self.circle_colliders.push((
+            projectile,
+            CircleCollider {
+                radius: weapon.projectile_collider_radius,
+            },
+        ));
+        self.damage.push((
+            projectile,
+            Damage {
+                amount: weapon.projectile_damage,
+            },
+        ));
 
         projectile
     }
@@ -232,16 +264,24 @@ impl Scene {
             .iter()
             .find_map(|(id, pickup)| (*id == entity).then_some(pickup))
     }
+
+    pub fn enemy(&self, entity: EntityId) -> Option<&Enemy> {
+        self.enemy_components
+            .iter()
+            .find_map(|(id, enemy)| (*id == entity).then_some(enemy))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::super::test_helpers::scene_with_only_player;
     use super::*;
+    use crate::app::game::WeaponKind;
 
     #[test]
     fn test_new_survivor_demo_creates_valid_player() {
-        let scene = Scene::new_survivor_demo();
+        let catalog = GameCatalog::default();
+        let scene = Scene::new_survivor_demo(&catalog);
 
         assert!(scene.transform(scene.player).is_some());
         assert!(scene.sprite(scene.player).is_some());
@@ -255,10 +295,12 @@ mod tests {
     #[test]
     fn test_spawn_enemy_creates_transform_sprite_and_enemy_tag() {
         let mut scene = scene_with_only_player();
+        let catalog = GameCatalog::default();
 
-        let enemy = scene.spawn_enemy([3.0, 4.0]);
+        let enemy = scene.spawn_enemy([3.0, 4.0], EnemyKind::Basic, &catalog);
 
         assert!(scene.enemies.contains(&enemy));
+        assert_eq!(scene.enemy(enemy).unwrap().kind, EnemyKind::Basic);
         assert_eq!(scene.transform(enemy).unwrap().position, [3.0, 4.0]);
         assert_eq!(
             scene.sprite(enemy).unwrap(),
@@ -289,8 +331,10 @@ mod tests {
     #[test]
     fn test_spawn_projectile_creates_transform_sprite_and_projectile_component() {
         let mut scene = scene_with_only_player();
+        let catalog = GameCatalog::default();
+        let weapon = catalog.weapon(WeaponKind::Wand);
 
-        let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0]);
+        let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0], weapon);
 
         assert_eq!(scene.transform(projectile).unwrap().position, [1.0, 2.0]);
         assert_eq!(
@@ -350,9 +394,11 @@ mod tests {
     #[test]
     fn test_despawn_entity_removes_components_and_tags() {
         let mut scene = scene_with_only_player();
+        let catalog = GameCatalog::default();
+        let weapon = catalog.weapon(WeaponKind::Wand);
 
-        let enemy = scene.spawn_enemy([3.0, 4.0]);
-        let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0]);
+        let enemy = scene.spawn_enemy([3.0, 4.0], EnemyKind::Basic, &catalog);
+        let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0], weapon);
         let pickup = scene.spawn_pickup([2.0, 3.0], PickupReward::Experience(7));
 
         scene.despawn_entity(enemy);
@@ -364,6 +410,7 @@ mod tests {
         assert!(scene.circle_collider(enemy).is_none());
         assert!(scene.health(enemy).is_none());
         assert!(scene.death_drop(enemy).is_none());
+        assert!(scene.enemy(enemy).is_none());
         assert!(!scene.enemies.contains(&enemy));
 
         assert!(scene.transform(projectile).is_none());
@@ -386,7 +433,9 @@ mod tests {
     #[test]
     fn test_mut_helpers_update_sprite_circle_collider_and_damage_components() {
         let mut scene = scene_with_only_player();
-        let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0]);
+        let catalog = GameCatalog::default();
+        let weapon = catalog.weapon(WeaponKind::Wand);
+        let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0], weapon);
 
         scene.sprite_mut(scene.player).unwrap().size = [2.0, 2.0];
         scene.circle_collider_mut(scene.player).unwrap().radius = 0.5;

@@ -16,11 +16,13 @@ impl PlayerController {
 
 #[cfg(test)]
 mod tests {
+    use super::super::super::GameCatalog;
     use super::*;
 
     #[test]
     fn test_player_moves_by_direction_speed_and_delta() {
-        let mut scene = Scene::new_survivor_demo();
+        let catalog = GameCatalog::default();
+        let mut scene = Scene::new_survivor_demo(&catalog);
         let mut player = PlayerController;
 
         player.fixed_update(&mut scene, [1.0, 0.0], 0.5);

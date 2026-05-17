@@ -1,21 +1,50 @@
-use super::Scene;
+use super::{GameCatalog, Scene, WeaponKind};
 
-#[derive(Default)]
+pub struct WeaponState {
+    pub kind: WeaponKind,
+    pub cooldown_remaining_secs: f32,
+}
+
 pub struct CombatState {
-    pub weapon_cooldown_secs: f32,
+    pub weapon_state: WeaponState,
+}
+
+impl Default for CombatState {
+    fn default() -> Self {
+        Self {
+            weapon_state: WeaponState {
+                kind: WeaponKind::Wand,
+                cooldown_remaining_secs: 0.0,
+            },
+        }
+    }
 }
 
 impl CombatState {
-    pub fn fixed_update(&mut self, scene: &mut Scene, player_position: [f32; 2], delta_secs: f32) {
-        self.update_weapon(scene, player_position, delta_secs);
+    pub fn fixed_update(
+        &mut self,
+        scene: &mut Scene,
+        catalog: &GameCatalog,
+        player_position: [f32; 2],
+        delta_secs: f32,
+    ) {
+        self.update_weapon(scene, catalog, player_position, delta_secs);
         self.update_projectiles(scene, delta_secs);
         self.resolve_projectile_hits(scene);
     }
 
-    fn update_weapon(&mut self, scene: &mut Scene, player_position: [f32; 2], delta_secs: f32) {
-        self.weapon_cooldown_secs = (self.weapon_cooldown_secs - delta_secs).max(0.0);
+    fn update_weapon(
+        &mut self,
+        scene: &mut Scene,
+        catalog: &GameCatalog,
+        player_position: [f32; 2],
+        delta_secs: f32,
+    ) {
+        let weapon = catalog.weapon(self.weapon_state.kind);
+        self.weapon_state.cooldown_remaining_secs =
+            (self.weapon_state.cooldown_remaining_secs - delta_secs).max(0.0);
 
-        if self.weapon_cooldown_secs > 0.0 {
+        if self.weapon_state.cooldown_remaining_secs > 0.0 {
             return;
         }
 
@@ -34,18 +63,18 @@ impl CombatState {
             return;
         }
 
-        let projectile_speed = 8.0;
         let direction = [to_target[0] / distance, to_target[1] / distance];
 
         scene.spawn_projectile(
             player_position,
             [
-                direction[0] * projectile_speed,
-                direction[1] * projectile_speed,
+                direction[0] * weapon.projectile_speed,
+                direction[1] * weapon.projectile_speed,
             ],
+            weapon,
         );
 
-        self.weapon_cooldown_secs = 0.5;
+        self.weapon_state.cooldown_remaining_secs = weapon.cooldown_secs;
     }
 
     fn update_projectiles(&mut self, scene: &mut Scene, delta_secs: f32) {
@@ -198,13 +227,16 @@ fn distance_point_to_segment(point: [f32; 2], start: [f32; 2], end: [f32; 2]) ->
 mod tests {
     use super::super::test_helpers::scene_with_only_player;
     use super::*;
+    use crate::app::game::EnemyKind;
 
     #[test]
     fn test_projectile_hit_despawns_enemy_and_projectile() {
         let mut scene = scene_with_only_player();
+        let catalog = GameCatalog::default();
+        let weapon = catalog.weapon(WeaponKind::Wand);
 
-        let enemy = scene.spawn_enemy([1.0, 0.0]);
-        let projectile_entity = scene.spawn_projectile([2.0, 0.0], [1.0, 0.0]);
+        let enemy = scene.spawn_enemy([1.0, 0.0], EnemyKind::Basic, &catalog);
+        let projectile_entity = scene.spawn_projectile([2.0, 0.0], [1.0, 0.0], weapon);
 
         scene
             .projectiles
@@ -235,9 +267,11 @@ mod tests {
     #[test]
     fn test_projectile_miss_keeps_enemy_and_projectile() {
         let mut scene = scene_with_only_player();
+        let catalog = GameCatalog::default();
+        let weapon = catalog.weapon(WeaponKind::Wand);
 
-        let enemy = scene.spawn_enemy([1.0, 0.51]);
-        let projectile_entity = scene.spawn_projectile([2.0, 0.0], [1.0, 0.0]);
+        let enemy = scene.spawn_enemy([1.0, 0.51], EnemyKind::Basic, &catalog);
+        let projectile_entity = scene.spawn_projectile([2.0, 0.0], [1.0, 0.0], weapon);
 
         scene
             .projectiles
@@ -262,9 +296,11 @@ mod tests {
     #[test]
     fn test_projectile_hit_damages_enemy_without_despawning_nonlethal_enemy() {
         let mut scene = scene_with_only_player();
+        let catalog = GameCatalog::default();
+        let weapon = catalog.weapon(WeaponKind::Wand);
 
-        let enemy = scene.spawn_enemy([1.0, 0.0]);
-        let projectile_entity = scene.spawn_projectile([2.0, 0.0], [1.0, 0.0]);
+        let enemy = scene.spawn_enemy([1.0, 0.0], EnemyKind::Basic, &catalog);
+        let projectile_entity = scene.spawn_projectile([2.0, 0.0], [1.0, 0.0], weapon);
 
         scene
             .projectiles
@@ -292,13 +328,14 @@ mod tests {
     #[test]
     fn test_fixed_update_fires_at_nearest_enemy() {
         let mut scene = scene_with_only_player();
-        scene.spawn_enemy([4.0, 0.0]);
+        let catalog = GameCatalog::default();
+        scene.spawn_enemy([4.0, 0.0], EnemyKind::Basic, &catalog);
 
         let mut combat = CombatState::default();
 
-        combat.fixed_update(&mut scene, [0.0, 0.0], 0.0);
+        combat.fixed_update(&mut scene, &catalog, [0.0, 0.0], 0.0);
 
         assert_eq!(scene.projectiles.len(), 1);
-        assert_eq!(combat.weapon_cooldown_secs, 0.5);
+        assert_eq!(combat.weapon_state.cooldown_remaining_secs, 0.5);
     }
 }
