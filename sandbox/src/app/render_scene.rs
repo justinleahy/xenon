@@ -19,19 +19,6 @@ pub fn build_render_sprites(state: &SandboxState) -> Vec<RenderSprite> {
         });
     }
 
-    for projectile in &state.scene.projectiles {
-        let Some(projectile_position) = state.scene.transform(projectile.0).map(|t| t.position)
-        else {
-            continue;
-        };
-
-        sprites.push(RenderSprite {
-            position: projectile_position,
-            size: [0.25, 0.25],
-            color: [0.35, 0.75, 1.0, 1.0],
-        });
-    }
-
     append_health_bar_sprites(&mut sprites, state);
 
     sprites
@@ -122,4 +109,125 @@ fn append_health_bar_sprites(sprites: &mut Vec<RenderSprite>, state: &SandboxSta
         size: [fill_width, bar_height],
         color: fill_color,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::game::components::{Sprite, Transform};
+    use super::super::state::SandboxState;
+    use super::*;
+
+    fn render_sprite_count(sprites: &[RenderSprite], expected: RenderSprite) -> usize {
+        sprites.iter().filter(|sprite| **sprite == expected).count()
+    }
+
+    fn state_with_empty_scene() -> SandboxState {
+        let mut state = SandboxState::default();
+        let player = state.scene.player;
+
+        state.scene.enemies.clear();
+        state.scene.projectiles.clear();
+        state.scene.sprites.clear();
+        state.scene.health.clear();
+        state
+            .scene
+            .transforms
+            .retain(|(entity, _)| *entity == player);
+
+        state
+    }
+
+    #[test]
+    fn test_build_render_sprites_includes_entities_with_transform_and_sprite() {
+        let mut state = state_with_empty_scene();
+        let entity = state.scene.spawn_entity();
+
+        state.scene.transforms.push((
+            entity,
+            Transform {
+                position: [12.5, -3.25],
+            },
+        ));
+        state.scene.sprites.push((
+            entity,
+            Sprite {
+                size: [2.0, 3.0],
+                color: [0.1, 0.2, 0.3, 1.0],
+            },
+        ));
+
+        let sprites = build_render_sprites(&state);
+
+        assert_eq!(
+            render_sprite_count(
+                &sprites,
+                RenderSprite {
+                    position: [12.5, -3.25],
+                    size: [2.0, 3.0],
+                    color: [0.1, 0.2, 0.3, 1.0],
+                },
+            ),
+            1
+        );
+    }
+
+    #[test]
+    fn test_build_render_sprites_skips_entities_without_sprite() {
+        let mut state = state_with_empty_scene();
+        let entity = state.scene.spawn_entity();
+
+        state.scene.transforms.push((
+            entity,
+            Transform {
+                position: [12.5, -3.25],
+            },
+        ));
+
+        let sprites = build_render_sprites(&state);
+
+        assert!(!sprites.iter().any(|sprite| {
+            sprite.position == [12.5, -3.25]
+                && sprite.size == [2.0, 3.0]
+                && sprite.color == [0.1, 0.2, 0.3, 1.0]
+        }));
+    }
+
+    #[test]
+    fn test_build_render_sprites_renders_projectiles_from_scene_components_once() {
+        let mut state = state_with_empty_scene();
+
+        state.scene.spawn_projectile([2.0, 3.0], [8.0, 0.0]);
+
+        let sprites = build_render_sprites(&state);
+
+        assert_eq!(
+            render_sprite_count(
+                &sprites,
+                RenderSprite {
+                    position: [2.0, 3.0],
+                    size: [0.25, 0.25],
+                    color: [0.35, 0.75, 1.0, 1.0],
+                },
+            ),
+            1
+        );
+    }
+
+    #[test]
+    fn test_build_render_sprites_appends_grid_and_health_bar() {
+        let state = SandboxState::default();
+
+        let sprites = build_render_sprites(&state);
+
+        assert!(sprites.iter().any(|sprite| {
+            sprite.position == [0.0, 0.0]
+                && sprite.size == [2.0 / 32.0, 40.0]
+                && sprite.color == [0.18, 0.24, 0.28, 1.0]
+        }));
+        assert!(sprites.iter().any(|sprite| {
+            sprite.position == [-17.0, -10.0]
+                && sprite.size == [8.0, 0.35]
+                && sprite.color == [0.18, 0.08, 0.08, 1.0]
+        }));
+    }
 }
