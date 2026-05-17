@@ -36,6 +36,7 @@ pub struct InputState {
     move_down: bool,
     move_left: bool,
     move_right: bool,
+    reset_requested: bool,
 }
 
 impl SandboxApp {
@@ -54,6 +55,14 @@ impl SandboxApp {
     }
 
     fn fixed_update(&mut self) {
+        if self.input.reset_requested {
+            self.state = SandboxState::default();
+            self.input.reset_requested = false;
+
+            info!("simulation reset");
+            return;
+        }
+
         let delta_secs = self.fixed_timestep.step().as_secs_f32();
         let speed = 240.0;
 
@@ -231,6 +240,10 @@ impl ApplicationHandler for SandboxApp {
 
                     PhysicalKey::Code(KeyCode::KeyD) | PhysicalKey::Code(KeyCode::ArrowRight) => {
                         self.input.move_right = is_pressed;
+                    }
+
+                    PhysicalKey::Code(KeyCode::KeyR) => {
+                        self.input.reset_requested = is_pressed;
                     }
 
                     _ => {}
