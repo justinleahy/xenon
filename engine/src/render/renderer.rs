@@ -1,4 +1,4 @@
-use super::{RenderError, RenderScene, RenderSprite};
+use super::{RenderCamera, RenderError, RenderScene, RenderSprite};
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
@@ -51,16 +51,36 @@ impl SpriteInstance {
     const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
         wgpu::vertex_attr_array![1 => Float32x2, 2 => Float32x2, 3 => Float32x4];
 
-    fn from_sprite(sprite: RenderSprite, surface_width: u32, surface_height: u32) -> Self {
+    fn from_sprite(
+        sprite: RenderSprite,
+        camera: RenderCamera,
+        surface_width: u32,
+        surface_height: u32,
+    ) -> Self {
         let width = surface_width.max(1) as f32;
         let height = surface_height.max(1) as f32;
 
+        let relative_world = [
+            sprite.position[0] - camera.position[0],
+            sprite.position[1] - camera.position[1],
+        ];
+
+        let screen_pixels = [
+            relative_world[0] * camera.pixels_per_world_unit,
+            relative_world[1] * camera.pixels_per_world_unit,
+        ];
+
+        let size_pixels = [
+            sprite.size[0] * camera.pixels_per_world_unit,
+            sprite.size[1] * camera.pixels_per_world_unit,
+        ];
+
         Self {
             translation: [
-                sprite.position[0] / (width * 0.5),
-                -sprite.position[1] / (height * 0.5),
+                screen_pixels[0] / (width * 0.5),
+                -screen_pixels[1] / (height * 0.5),
             ],
-            scale: [sprite.size[0] / width, sprite.size[1] / height],
+            scale: [size_pixels[0] / width, size_pixels[1] / height],
             color: sprite.color,
         }
     }
@@ -255,7 +275,12 @@ impl<'window> Renderer<'window> {
                 .iter()
                 .copied()
                 .map(|sprite| {
-                    SpriteInstance::from_sprite(sprite, self.config.width, self.config.height)
+                    SpriteInstance::from_sprite(
+                        sprite,
+                        scene.camera,
+                        self.config.width,
+                        self.config.height,
+                    )
                 })
                 .collect();
 

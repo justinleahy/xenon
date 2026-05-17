@@ -1,6 +1,6 @@
 use engine::{
-    EngineConfig, FixedTimestep, FpsCounter, FrameClock, FrameTiming, LifecycleEvent, RenderScene,
-    RenderSprite, Renderer,
+    EngineConfig, FixedTimestep, FpsCounter, FrameClock, FrameTiming, LifecycleEvent, RenderCamera,
+    RenderScene, RenderSprite, Renderer,
 };
 use std::sync::Arc;
 use tracing::info;
@@ -65,7 +65,7 @@ impl SandboxApp {
         }
 
         let delta_secs = self.fixed_timestep.step().as_secs_f32();
-        let speed = 240.0;
+        let speed = 5.0;
 
         let mut direction = [0.0_f32, 0.0_f32];
 
@@ -122,13 +122,13 @@ impl SandboxApp {
 
         let sprites = [
             RenderSprite {
-                position: [150.0, 150.0],
-                size: [32.0, 32.0],
+                position: [3.0, 3.0],
+                size: [1.0, 1.0],
                 color: [0.0, 0.9, 0.55, 1.0],
             },
             RenderSprite {
                 position: self.state.player_position,
-                size: [32.0, 32.0],
+                size: [1.0, 1.0],
                 color: [0.95, 0.9, 0.55, 1.0],
             },
         ];
@@ -136,7 +136,16 @@ impl SandboxApp {
         renderer.resize(size.width, size.height);
 
         renderer
-            .render(self.config.clear_color, RenderScene { sprites: &sprites })
+            .render(
+                self.config.clear_color,
+                RenderScene {
+                    camera: RenderCamera {
+                        position: self.state.player_position,
+                        pixels_per_world_unit: 32.0,
+                    },
+                    sprites: &sprites,
+                },
+            )
             .expect("failed to render frame");
     }
 
