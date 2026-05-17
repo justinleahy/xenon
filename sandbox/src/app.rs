@@ -24,11 +24,28 @@ pub struct SandboxApp {
     pub renderer: Option<Renderer<'static>>,
 }
 
-#[derive(Default)]
+pub struct Enemy {
+    position: [f32; 2],
+}
+
 pub struct SandboxState {
     simulation_time_secs: f64,
     fixed_updates: u64,
     player_position: [f32; 2],
+    enemies: Vec<Enemy>,
+}
+
+impl Default for SandboxState {
+    fn default() -> Self {
+        Self {
+            simulation_time_secs: 0.0,
+            fixed_updates: 0,
+            player_position: [0.0, 0.0],
+            enemies: vec![Enemy {
+                position: [5.0, 5.0],
+            }],
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -65,6 +82,7 @@ impl SandboxApp {
         }
 
         let delta_secs = self.fixed_timestep.step().as_secs_f32();
+        let enemy_speed = 1.5;
         let speed = 5.0;
 
         let mut direction = [0.0_f32, 0.0_f32];
@@ -95,6 +113,22 @@ impl SandboxApp {
         self.state.player_position[0] += direction[0] * speed * delta_secs;
         self.state.player_position[1] += direction[1] * speed * delta_secs;
 
+        for enemy in &mut self.state.enemies {
+            let to_player = [
+                self.state.player_position[0] - enemy.position[0],
+                self.state.player_position[1] - enemy.position[1],
+            ];
+
+            let distance = (to_player[0] * to_player[0] + to_player[1] * to_player[1]).sqrt();
+
+            if distance > 0.001 {
+                let direction = [to_player[0] / distance, to_player[1] / distance];
+
+                enemy.position[0] += direction[0] * enemy_speed * delta_secs;
+                enemy.position[1] += direction[1] * enemy_speed * delta_secs;
+            }
+        }
+
         self.state.fixed_updates += 1;
         self.state.simulation_time_secs += self.fixed_timestep.step().as_secs_f64();
 
@@ -124,11 +158,13 @@ impl SandboxApp {
 
         append_grid_sprites(&mut sprites, self.state.player_position, 20);
 
-        sprites.push(RenderSprite {
-            position: [3.0, 3.0],
-            size: [1.0, 1.0],
-            color: [0.0, 0.9, 0.55, 1.0],
-        });
+        for enemy in &self.state.enemies {
+            sprites.push(RenderSprite {
+                position: enemy.position,
+                size: [1.0, 1.0],
+                color: [0.9, 0.35, 0.55, 1.0],
+            });
+        }
 
         sprites.push(RenderSprite {
             position: self.state.player_position,
