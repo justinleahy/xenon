@@ -22,7 +22,7 @@ impl EnemyState {
         delta_secs: f32,
     ) {
         self.update_spawning(scene, player_position, fixed_updates, delta_secs);
-        self.update_moveement_and_contact_damage(scene, player_position, delta_secs);
+        self.update_movement_and_contact_damage(scene, player_position, delta_secs);
     }
 
     fn update_spawning(
@@ -59,7 +59,7 @@ impl EnemyState {
         self.spawn_cooldown_secs = 1.5;
     }
 
-    pub fn update_moveement_and_contact_damage(
+    pub fn update_movement_and_contact_damage(
         &mut self,
         scene: &mut Scene,
         player_position: [f32; 2],
