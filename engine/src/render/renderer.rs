@@ -2,6 +2,8 @@ use super::{RenderError, RenderScene, RenderSprite};
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
+const MAX_SPRITE_INSTANCES: usize = 1024;
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct Vertex {
@@ -83,6 +85,8 @@ pub struct Renderer<'window> {
     quad_vertex_buffer: wgpu::Buffer,
     quad_index_buffer: wgpu::Buffer,
     quad_index_count: u32,
+    sprite_instance_buffer: wgpu::Buffer,
+    sprite_instance_capacity: usize,
 }
 
 impl<'window> Renderer<'window> {
@@ -172,6 +176,16 @@ impl<'window> Renderer<'window> {
 
         let quad_index_count = QUAD_INDICES.len() as u32;
 
+        let sprite_instance_capacity = MAX_SPRITE_INSTANCES;
+
+        let sprite_instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Xenon Sprite Instance Buffer"),
+            size: (std::mem::size_of::<SpriteInstance>() * sprite_instance_capacity)
+                as wgpu::BufferAddress,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         Ok(Self {
             _instance: instance,
             surface,
@@ -183,6 +197,8 @@ impl<'window> Renderer<'window> {
             quad_vertex_buffer,
             quad_index_buffer,
             quad_index_count,
+            sprite_instance_buffer,
+            sprite_instance_capacity,
         })
     }
 
@@ -243,18 +259,20 @@ impl<'window> Renderer<'window> {
                 })
                 .collect();
 
-            let sprite_instance_buffer = if sprite_instances.is_empty() {
-                None
-            } else {
-                Some(
-                    self.device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Xenon Sprite Instance Buffer"),
-                            contents: bytemuck::cast_slice(&sprite_instances),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        }),
+            if sprite_instances.len() > self.sprite_instance_capacity {
+                return Err(RenderError::TooManySprites {
+                    count: sprite_instances.len(),
+                    capacity: self.sprite_instance_capacity,
+                });
+            }
+
+            if !sprite_instances.is_empty() {
+                self.queue.write_buffer(
+                    &self.sprite_instance_buffer,
+                    0,
+                    bytemuck::cast_slice(&sprite_instances),
                 )
-            };
+            }
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Xenon Clear Pass"),
@@ -273,10 +291,10 @@ impl<'window> Renderer<'window> {
                 multiview_mask: None,
             });
 
-            if let Some(sprite_instance_buffer) = sprite_instance_buffer.as_ref() {
+            if !sprite_instances.is_empty() {
                 render_pass.set_pipeline(&self.quad_pipeline);
                 render_pass.set_vertex_buffer(0, self.quad_vertex_buffer.slice(..));
-                render_pass.set_vertex_buffer(1, sprite_instance_buffer.slice(..));
+                render_pass.set_vertex_buffer(1, self.sprite_instance_buffer.slice(..));
                 render_pass
                     .set_index_buffer(self.quad_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                 render_pass.draw_indexed(

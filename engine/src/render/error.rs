@@ -14,4 +14,7 @@ pub enum RenderError {
 
     #[error("surface validation failed")]
     SurfaceValidation,
+
+    #[error("too many sprites to render: {count} requested, capacity is {capacity}")]
+    TooManySprites { count: usize, capacity: usize },
 }
