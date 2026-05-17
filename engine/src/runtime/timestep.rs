@@ -26,7 +26,7 @@ impl Iterator for FixedSteps {
             delta: self.delta,
         };
 
-        self.next_step_index += 1;
+        self.next_step_index = self.next_step_index.saturating_add(1);
         self.remaining -= 1;
 
         Some(step)
@@ -71,19 +71,19 @@ impl FixedTimestep {
             self.accumulated = self.max_accumulated;
         }
 
-        let mut steps_to_run = 0;
+        let mut steps_to_run: u32 = 0;
 
         while self.accumulated >= self.step {
             self.accumulated = self.accumulated.saturating_sub(self.step);
             steps_to_run += 1;
         }
 
-        let first_step_index = self.step_index + 1;
-        self.step_index += steps_to_run as u64;
+        let first_step_index = self.step_index.saturating_add(1);
+        self.step_index = self.step_index.saturating_add(steps_to_run as u64);
 
         FixedSteps {
             next_step_index: first_step_index,
-            remaining: steps_to_run as u32,
+            remaining: steps_to_run,
             delta: self.step,
         }
     }
