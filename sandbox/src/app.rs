@@ -4,8 +4,9 @@ use std::sync::Arc;
 use tracing::info;
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
+    event::{ElementState, WindowEvent},
     event_loop::ActiveEventLoop,
+    keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowId},
 };
 
@@ -15,9 +16,26 @@ pub struct SandboxApp {
     pub frame_clock: FrameClock,
     pub fixed_timestep: FixedTimestep,
     pub fps_counter: FpsCounter,
+    pub state: SandboxState,
+    pub input: InputState,
     pub window: Option<Arc<Window>>,
     pub context: Option<Context<Arc<Window>>>,
     pub surface: Option<Surface<Arc<Window>, Arc<Window>>>,
+}
+
+#[derive(Default)]
+pub struct SandboxState {
+    simulation_time_secs: f64,
+    fixed_updates: u64,
+    player_position: [f32; 2],
+}
+
+#[derive(Debug, Default)]
+pub struct InputState {
+    move_up: bool,
+    move_down: bool,
+    move_left: bool,
+    move_right: bool,
 }
 
 impl SandboxApp {
@@ -27,6 +45,8 @@ impl SandboxApp {
             frame_clock: FrameClock::new(),
             fixed_timestep: FixedTimestep::default(),
             fps_counter: FpsCounter::default(),
+            state: SandboxState::default(),
+            input: InputState::default(),
             window: None,
             context: None,
             surface: None,
@@ -34,7 +54,49 @@ impl SandboxApp {
     }
 
     fn fixed_update(&mut self) {
-        // Future gameplay simulation
+        let delta_secs = self.fixed_timestep.step().as_secs_f32();
+        let speed = 240.0;
+
+        let mut direction = [0.0_f32, 0.0_f32];
+
+        if self.input.move_up {
+            direction[1] -= 1.0;
+        }
+
+        if self.input.move_down {
+            direction[1] += 1.0;
+        }
+
+        if self.input.move_left {
+            direction[0] -= 1.0;
+        }
+
+        if self.input.move_right {
+            direction[0] += 1.0;
+        }
+
+        let length = (direction[0] * direction[0] + direction[1] * direction[1]).sqrt();
+
+        if length > 0.0 {
+            direction[0] /= length;
+            direction[1] /= length;
+        }
+
+        self.state.player_position[0] += direction[0] * speed * delta_secs;
+        self.state.player_position[1] += direction[1] * speed * delta_secs;
+
+        self.state.fixed_updates += 1;
+        self.state.simulation_time_secs += self.fixed_timestep.step().as_secs_f64();
+
+        if self.state.fixed_updates % 60 == 0 {
+            info!(
+                fixed_updates = self.state.fixed_updates,
+                simulation_time_secs = self.state.simulation_time_secs,
+                player_x = self.state.player_position[0],
+                player_y = self.state.player_position[1],
+                "simulation state"
+            );
+        }
     }
 
     fn render(&mut self) {
@@ -66,6 +128,20 @@ impl SandboxApp {
         for pixel in buffer.iter_mut() {
             *pixel = clear_color;
         }
+
+        let player_x = (size.width as f32 * 0.5 + self.state.player_position[0]).round() as i32;
+        let player_y = (size.height as f32 * 0.5 + self.state.player_position[1]).round() as i32;
+
+        draw_filled_rect(
+            &mut buffer,
+            size.width,
+            size.height,
+            player_x - 8,
+            player_y - 8,
+            16,
+            16,
+            0x00f0e68c,
+        );
 
         buffer.present().expect("failed to present buffer");
     }
@@ -137,6 +213,30 @@ impl ApplicationHandler for SandboxApp {
                 self.render();
             }
 
+            WindowEvent::KeyboardInput { event, .. } => {
+                let is_pressed = event.state == ElementState::Pressed;
+
+                match event.physical_key {
+                    PhysicalKey::Code(KeyCode::KeyW) | PhysicalKey::Code(KeyCode::ArrowUp) => {
+                        self.input.move_up = is_pressed;
+                    }
+
+                    PhysicalKey::Code(KeyCode::KeyS) | PhysicalKey::Code(KeyCode::ArrowDown) => {
+                        self.input.move_down = is_pressed;
+                    }
+
+                    PhysicalKey::Code(KeyCode::KeyA) | PhysicalKey::Code(KeyCode::ArrowLeft) => {
+                        self.input.move_left = is_pressed;
+                    }
+
+                    PhysicalKey::Code(KeyCode::KeyD) | PhysicalKey::Code(KeyCode::ArrowRight) => {
+                        self.input.move_right = is_pressed;
+                    }
+
+                    _ => {}
+                }
+            }
+
             _ => {}
         }
     }
@@ -150,4 +250,29 @@ impl ApplicationHandler for SandboxApp {
 
 fn clear_color_to_softbuffer_pixel([r, g, b, _a]: [u8; 4]) -> u32 {
     ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
+}
+
+fn draw_filled_rect(
+    buffer: &mut [u32],
+    buffer_width: u32,
+    buffer_height: u32,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    color: u32,
+) {
+    let min_x = x.max(0) as u32;
+    let min_y = y.max(0) as u32;
+
+    let max_x = (x + width as i32).clamp(0, buffer_width as i32) as u32;
+    let max_y = (y + height as i32).clamp(0, buffer_height as i32) as u32;
+
+    for py in min_y..max_y {
+        let row_start = (py * buffer_width) as usize;
+
+        for px in min_x..max_x {
+            buffer[row_start + px as usize] = color;
+        }
+    }
 }
