@@ -90,7 +90,17 @@ impl EnemyState {
                 }
             }
 
-            if distance < 0.25 {
+            let Some(enemy_collider) = scene.circle_collider(enemy) else {
+                continue;
+            };
+
+            let Some(player_collider) = scene.circle_collider(scene.player) else {
+                continue;
+            };
+
+            let contact_distance = enemy_collider.radius + player_collider.radius;
+
+            if distance < contact_distance {
                 if let Some(health) = scene.health_mut(scene.player) {
                     let previous_health = health.current;
                     health.current =
@@ -113,10 +123,15 @@ mod tests {
         let mut scene = Scene::new_survivor_demo();
 
         scene.enemies.clear();
+        scene.projectiles.clear();
         scene
             .transforms
             .retain(|(entity, _)| *entity == scene.player);
         scene.health.retain(|(entity, _)| *entity == scene.player);
+        scene.sprites.retain(|(entity, _)| *entity == scene.player);
+        scene
+            .circle_colliders
+            .retain(|(entity, _)| *entity == scene.player);
 
         scene
     }
@@ -149,5 +164,29 @@ mod tests {
 
         assert!(enemy_position[0] < 10.0);
         assert_eq!(enemy_position[1], 0.0);
+    }
+
+    #[test]
+    fn test_enemy_contact_damage_uses_circle_colliders() {
+        let mut scene = scene_with_only_player();
+        scene.spawn_enemy([0.69, 0.0]);
+
+        let mut enemies = EnemyState::default();
+
+        enemies.update_movement_and_contact_damage(&mut scene, [0.0, 0.0], 1.0);
+
+        assert_eq!(scene.health(scene.player).unwrap().current, 90.0);
+    }
+
+    #[test]
+    fn test_enemy_outside_contact_distance_does_not_damage_player() {
+        let mut scene = scene_with_only_player();
+        scene.spawn_enemy([0.71, 0.0]);
+
+        let mut enemies = EnemyState::default();
+
+        enemies.update_movement_and_contact_damage(&mut scene, [0.0, 0.0], 1.0);
+
+        assert_eq!(scene.health(scene.player).unwrap().current, 100.0);
     }
 }

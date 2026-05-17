@@ -1,5 +1,5 @@
 use super::{
-    components::{Health, Projectile, Sprite, Transform},
+    components::{CircleCollider, Health, Projectile, Sprite, Transform},
     entity::EntityId,
 };
 
@@ -11,6 +11,7 @@ pub struct Scene {
     pub enemies: Vec<EntityId>,
     pub sprites: Vec<(EntityId, Sprite)>,
     pub projectiles: Vec<(EntityId, Projectile)>,
+    pub circle_colliders: Vec<(EntityId, CircleCollider)>,
 }
 
 impl Scene {
@@ -23,6 +24,7 @@ impl Scene {
             enemies: Vec::new(),
             sprites: Vec::new(),
             projectiles: Vec::new(),
+            circle_colliders: Vec::new(),
         };
 
         let player = scene.spawn_entity();
@@ -47,6 +49,9 @@ impl Scene {
                 max: 100.0,
             },
         ));
+        scene
+            .circle_colliders
+            .push((player, CircleCollider { radius: 0.35 }));
 
         scene.spawn_enemy([5.0, 5.0]);
 
@@ -65,6 +70,7 @@ impl Scene {
         self.enemies.retain(|id| *id != entity);
         self.sprites.retain(|(id, _)| *id != entity);
         self.projectiles.retain(|(id, _)| *id != entity);
+        self.circle_colliders.retain(|(id, _)| *id != entity);
     }
 
     pub fn spawn_enemy(&mut self, position: [f32; 2]) -> EntityId {
@@ -78,6 +84,8 @@ impl Scene {
                 color: [0.9, 0.35, 0.55, 1.0],
             },
         ));
+        self.circle_colliders
+            .push((enemy, CircleCollider { radius: 0.35 }));
         enemy
     }
 
@@ -85,7 +93,6 @@ impl Scene {
         let projectile = self.spawn_entity();
 
         self.transforms.push((projectile, Transform { position }));
-
         self.sprites.push((
             projectile,
             Sprite {
@@ -93,7 +100,6 @@ impl Scene {
                 color: [0.35, 0.75, 1.0, 1.0],
             },
         ));
-
         self.projectiles.push((
             projectile,
             Projectile {
@@ -102,6 +108,8 @@ impl Scene {
                 lifetime_secs: 2.0,
             },
         ));
+        self.circle_colliders
+            .push((projectile, CircleCollider { radius: 0.15 }));
 
         projectile
     }
@@ -136,11 +144,22 @@ impl Scene {
             .find_map(|(id, sprite)| (*id == entity).then_some(sprite))
     }
 
-    #[allow(dead_code)]
     pub fn sprite_mut(&mut self, entity: EntityId) -> Option<&mut Sprite> {
         self.sprites
             .iter_mut()
             .find_map(|(id, sprite)| (*id == entity).then_some(sprite))
+    }
+
+    pub fn circle_collider(&self, entity: EntityId) -> Option<&CircleCollider> {
+        self.circle_colliders
+            .iter()
+            .find_map(|(id, collider)| (*id == entity).then_some(collider))
+    }
+
+    pub fn circle_collider_mut(&mut self, entity: EntityId) -> Option<&mut CircleCollider> {
+        self.circle_colliders
+            .iter_mut()
+            .find_map(|(id, collider)| (*id == entity).then_some(collider))
     }
 }
 
@@ -158,6 +177,9 @@ mod tests {
             .retain(|(entity, _)| *entity == scene.player);
         scene.health.retain(|(entity, _)| *entity == scene.player);
         scene.sprites.retain(|(entity, _)| *entity == scene.player);
+        scene
+            .circle_colliders
+            .retain(|(entity, _)| *entity == scene.player);
 
         scene
     }
@@ -169,6 +191,10 @@ mod tests {
         assert!(scene.transform(scene.player).is_some());
         assert!(scene.sprite(scene.player).is_some());
         assert!(scene.health(scene.player).is_some());
+        assert_eq!(
+            scene.circle_collider(scene.player).unwrap(),
+            &CircleCollider { radius: 0.35 }
+        );
     }
 
     #[test]
@@ -185,6 +211,10 @@ mod tests {
                 size: [1.0, 1.0],
                 color: [0.9, 0.35, 0.55, 1.0],
             }
+        );
+        assert_eq!(
+            scene.circle_collider(enemy).unwrap(),
+            &CircleCollider { radius: 0.35 }
         );
     }
 
@@ -216,6 +246,10 @@ mod tests {
                 lifetime_secs: 2.0,
             }
         );
+        assert_eq!(
+            scene.circle_collider(projectile).unwrap(),
+            &CircleCollider { radius: 0.15 }
+        );
     }
 
     #[test]
@@ -230,15 +264,31 @@ mod tests {
 
         assert!(scene.transform(enemy).is_none());
         assert!(scene.sprite(enemy).is_none());
+        assert!(scene.circle_collider(enemy).is_none());
         assert!(!scene.enemies.contains(&enemy));
 
         assert!(scene.transform(projectile).is_none());
         assert!(scene.sprite(projectile).is_none());
+        assert!(scene.circle_collider(projectile).is_none());
         assert!(
             !scene
                 .projectiles
                 .iter()
                 .any(|(entity, _)| *entity == projectile)
+        );
+    }
+
+    #[test]
+    fn test_mut_helpers_update_sprite_and_circle_collider_components() {
+        let mut scene = scene_with_only_player();
+
+        scene.sprite_mut(scene.player).unwrap().size = [2.0, 2.0];
+        scene.circle_collider_mut(scene.player).unwrap().radius = 0.5;
+
+        assert_eq!(scene.sprite(scene.player).unwrap().size, [2.0, 2.0]);
+        assert_eq!(
+            scene.circle_collider(scene.player).unwrap(),
+            &CircleCollider { radius: 0.5 }
         );
     }
 }

@@ -69,8 +69,6 @@ impl CombatState {
     }
 
     fn resolve_projectile_hits(&mut self, scene: &mut Scene) {
-        let hit_radius = 0.30;
-
         let mut hit_enemies = Vec::new();
         let mut hit_projectiles = Vec::new();
 
@@ -80,12 +78,22 @@ impl CombatState {
                 continue;
             };
 
+            let Some(projectile_collider) = scene.circle_collider(*projectile_entity) else {
+                continue;
+            };
+
             for enemy in &scene.enemies {
                 let enemy = *enemy;
+
+                let Some(enemy_collider) = scene.circle_collider(enemy) else {
+                    continue;
+                };
 
                 let Some(enemy_position) = scene.transform(enemy).map(|t| t.position) else {
                     continue;
                 };
+
+                let hit_radius = projectile_collider.radius + enemy_collider.radius;
 
                 let distance = distance_point_to_segment(
                     enemy_position,
@@ -167,10 +175,15 @@ mod tests {
         let mut scene = Scene::new_survivor_demo();
 
         scene.enemies.clear();
+        scene.projectiles.clear();
         scene
             .transforms
             .retain(|(entity, _)| *entity == scene.player);
         scene.health.retain(|(entity, _)| *entity == scene.player);
+        scene.sprites.retain(|(entity, _)| *entity == scene.player);
+        scene
+            .circle_colliders
+            .retain(|(entity, _)| *entity == scene.player);
 
         scene
     }
@@ -206,7 +219,7 @@ mod tests {
     fn test_projectile_miss_keeps_enemy_and_projectile() {
         let mut scene = scene_with_only_player();
 
-        let enemy = scene.spawn_enemy([1.0, 1.0]);
+        let enemy = scene.spawn_enemy([1.0, 0.51]);
         let projectile_entity = scene.spawn_projectile([2.0, 0.0], [1.0, 0.0]);
 
         scene

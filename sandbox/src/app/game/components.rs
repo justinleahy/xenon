@@ -21,3 +21,8 @@ pub struct Projectile {
     pub velocity: [f32; 2],
     pub lifetime_secs: f32,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CircleCollider {
+    pub radius: f32,
+}

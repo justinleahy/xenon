@@ -129,6 +129,7 @@ mod tests {
         state.scene.projectiles.clear();
         state.scene.sprites.clear();
         state.scene.health.clear();
+        state.scene.circle_colliders.clear();
         state
             .scene
             .transforms
