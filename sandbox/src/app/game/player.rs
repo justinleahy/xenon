@@ -13,3 +13,18 @@ impl PlayerController {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_player_moves_by_direction_speed_and_delta() {
+        let mut scene = Scene::new_survivor_demo();
+        let mut player = PlayerController;
+
+        player.fixed_update(&mut scene, [1.0, 0.0], 0.5);
+
+        assert_eq!(scene.transform(scene.player).unwrap().position, [2.5, 0.0]);
+    }
+}

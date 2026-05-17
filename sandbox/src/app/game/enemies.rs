@@ -104,3 +104,50 @@ impl EnemyState {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scene_with_only_player() -> Scene {
+        let mut scene = Scene::new_survivor_demo();
+
+        scene.enemies.clear();
+        scene
+            .transforms
+            .retain(|(entity, _)| *entity == scene.player);
+        scene.health.retain(|(entity, _)| *entity == scene.player);
+
+        scene
+    }
+
+    #[test]
+    fn test_spawning_adds_enemy_after_cooldown() {
+        let mut scene = scene_with_only_player();
+        let initial_enemy_count = scene.enemies.len();
+
+        let mut enemies = EnemyState {
+            spawn_cooldown_secs: 0.0,
+        };
+
+        enemies.fixed_update(&mut scene, [0.0, 0.0], 1, 0.016);
+
+        assert_eq!(scene.enemies.len(), initial_enemy_count + 1);
+        assert_eq!(enemies.spawn_cooldown_secs, 1.5);
+    }
+
+    #[test]
+    fn test_enemy_moves_toward_player() {
+        let mut scene = scene_with_only_player();
+        let enemy = scene.spawn_enemy([10.0, 0.0]);
+
+        let mut enemies = EnemyState::default();
+
+        enemies.update_movement_and_contact_damage(&mut scene, [0.0, 0.0], 1.0);
+
+        let enemy_position = scene.transform(enemy).unwrap().position;
+
+        assert!(enemy_position[0] < 10.0);
+        assert_eq!(enemy_position[1], 0.0);
+    }
+}

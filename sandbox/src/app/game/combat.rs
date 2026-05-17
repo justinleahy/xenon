@@ -86,7 +86,7 @@ impl CombatState {
                 let distance = distance_point_to_segment(
                     enemy_position,
                     projectile.previous_position,
-                    projectile.previous_position,
+                    projectile.position,
                 );
 
                 if distance < hit_radius {
@@ -158,4 +158,78 @@ fn distance_point_to_segment(point: [f32; 2], start: [f32; 2], end: [f32; 2]) ->
     let closest = [start[0] + segment[0] * t, start[1] + segment[1] * t];
 
     squared_distance(point, closest).sqrt()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scene_with_only_player() -> Scene {
+        let mut scene = Scene::new_survivor_demo();
+
+        scene.enemies.clear();
+        scene
+            .transforms
+            .retain(|(entity, _)| *entity == scene.player);
+        scene.health.retain(|(entity, _)| *entity == scene.player);
+
+        scene
+    }
+
+    #[test]
+    fn test_projectile_hit_despawns_enemy_and_projectile() {
+        let mut scene = scene_with_only_player();
+
+        let enemy = scene.spawn_enemy([1.0, 0.0]);
+
+        let mut combat = CombatState {
+            projectiles: vec![Projectile {
+                position: [2.0, 0.0],
+                previous_position: [0.0, 0.0],
+                velocity: [1.0, 0.0],
+                lifetime_secs: 1.0,
+            }],
+            weapon_cooldown_secs: 0.0,
+        };
+
+        combat.resolve_projectile_hits(&mut scene);
+
+        assert!(!scene.enemies.contains(&enemy));
+        assert!(combat.projectiles.is_empty());
+    }
+
+    #[test]
+    fn test_projectile_miss_keeps_enemy_and_projectile() {
+        let mut scene = scene_with_only_player();
+
+        let enemy = scene.spawn_enemy([1.0, 1.0]);
+
+        let mut combat = CombatState {
+            projectiles: vec![Projectile {
+                position: [2.0, 0.0],
+                previous_position: [0.0, 0.0],
+                velocity: [1.0, 0.0],
+                lifetime_secs: 1.0,
+            }],
+            weapon_cooldown_secs: 0.0,
+        };
+
+        combat.resolve_projectile_hits(&mut scene);
+
+        assert!(scene.enemies.contains(&enemy));
+        assert_eq!(combat.projectiles.len(), 1);
+    }
+
+    #[test]
+    fn test_fixed_update_fires_at_nearest_enemy() {
+        let mut scene = scene_with_only_player();
+        scene.spawn_enemy([4.0, 0.0]);
+
+        let mut combat = CombatState::default();
+
+        combat.fixed_update(&mut scene, [0.0, 0.0], 0.0);
+
+        assert_eq!(combat.projectiles.len(), 1);
+        assert_eq!(combat.weapon_cooldown_secs, 0.5);
+    }
 }
