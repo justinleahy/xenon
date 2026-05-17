@@ -125,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tick_increaments_frame_index() {
+    fn test_tick_increments_frame_index() {
         let mut clock = FrameClock::new();
         clock.tick();
 
@@ -133,7 +133,7 @@ mod tests {
     }
 
     #[test]
-    fn test_consecutive_ticks_increament_frame_index() {
+    fn test_consecutive_ticks_increment_frame_index() {
         let mut clock = FrameClock::new();
         let first = clock.tick();
         let second = clock.tick();
