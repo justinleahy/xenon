@@ -1,4 +1,4 @@
-use super::{RenderError, RenderScene};
+use super::{RenderError, RenderScene, RenderSprite};
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
@@ -6,12 +6,10 @@ use wgpu::util::DeviceExt;
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct Vertex {
     position: [f32; 2],
-    color: [f32; 3],
 }
 
 impl Vertex {
-    const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x3];
+    const ATTRIBUTES: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![0 => Float32x2];
 
     fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
@@ -25,19 +23,15 @@ impl Vertex {
 const QUAD_VERTICES: &[Vertex] = &[
     Vertex {
         position: [-1.0, 1.0],
-        color: [0.95, 0.9, 0.55],
     },
     Vertex {
         position: [-1.0, -1.0],
-        color: [0.35, 0.7, 1.0],
     },
     Vertex {
         position: [1.0, -1.0],
-        color: [0.9, 0.35, 0.45],
     },
     Vertex {
         position: [1.0, 1.0],
-        color: [0.45, 0.95, 0.65],
     },
 ];
 
@@ -45,22 +39,35 @@ const QUAD_INDICES: &[u16] = &[0, 1, 2, 0, 2, 3];
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct SceneUniform {
+struct SpriteInstance {
     translation: [f32; 2],
     scale: [f32; 2],
+    color: [f32; 4],
 }
 
-impl SceneUniform {
-    fn from_scene(scene: RenderScene, surface_width: u32, surface_height: u32) -> Self {
+impl SpriteInstance {
+    const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
+        wgpu::vertex_attr_array![1 => Float32x2, 2 => Float32x2, 3 => Float32x4];
+
+    fn from_sprite(sprite: RenderSprite, surface_width: u32, surface_height: u32) -> Self {
         let width = surface_width.max(1) as f32;
         let height = surface_height.max(1) as f32;
 
         Self {
             translation: [
-                scene.player_position[0] / (width * 0.5),
-                -scene.player_position[1] / (height * 0.5),
+                sprite.position[0] / (width * 0.5),
+                -sprite.position[1] / (height * 0.5),
             ],
-            scale: [scene.player_size[0] / width, scene.player_size[1] / height],
+            scale: [sprite.size[0] / width, sprite.size[1] / height],
+            color: sprite.color,
+        }
+    }
+
+    fn layout() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &Self::ATTRIBUTES,
         }
     }
 }
@@ -76,8 +83,6 @@ pub struct Renderer<'window> {
     quad_vertex_buffer: wgpu::Buffer,
     quad_index_buffer: wgpu::Buffer,
     quad_index_count: u32,
-    scene_uniform_buffer: wgpu::Buffer,
-    scene_bind_group: wgpu::BindGroup,
 }
 
 impl<'window> Renderer<'window> {
@@ -121,44 +126,9 @@ impl<'window> Renderer<'window> {
             source: wgpu::ShaderSource::Wgsl(include_str!("shaders/colored.wgsl").into()),
         });
 
-        let scene_uniform = SceneUniform {
-            translation: [0.0, 0.0],
-            scale: [32.0 / width.max(1) as f32, 32.0 / height.max(1) as f32],
-        };
-
-        let scene_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Xenon Scene Uniform Buffer"),
-            contents: bytemuck::bytes_of(&scene_uniform),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let scene_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("Xenon Scene Bind Group Layout"),
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-            });
-
-        let scene_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Xenon Scene Bind Group"),
-            layout: &scene_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: scene_uniform_buffer.as_entire_binding(),
-            }],
-        });
-
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Xenon Triangle Pipeline Layout"),
-            bind_group_layouts: &[Some(&scene_bind_group_layout)],
+            bind_group_layouts: &[],
             immediate_size: 0,
         });
 
@@ -168,7 +138,7 @@ impl<'window> Renderer<'window> {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[Vertex::layout()],
+                buffers: &[Vertex::layout(), SpriteInstance::layout()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -213,8 +183,6 @@ impl<'window> Renderer<'window> {
             quad_vertex_buffer,
             quad_index_buffer,
             quad_index_count,
-            scene_uniform_buffer,
-            scene_bind_group,
         })
     }
 
@@ -232,15 +200,11 @@ impl<'window> Renderer<'window> {
         self.surface.configure(&self.device, &self.config);
     }
 
-    pub fn render(&mut self, clear_color: [u8; 4], scene: RenderScene) -> Result<(), RenderError> {
-        let scene_uniform = SceneUniform::from_scene(scene, self.config.width, self.config.height);
-
-        self.queue.write_buffer(
-            &self.scene_uniform_buffer,
-            0,
-            bytemuck::bytes_of(&scene_uniform),
-        );
-
+    pub fn render(
+        &mut self,
+        clear_color: [u8; 4],
+        scene: RenderScene<'_>,
+    ) -> Result<(), RenderError> {
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
@@ -270,6 +234,28 @@ impl<'window> Renderer<'window> {
             });
 
         {
+            let sprite_instances: Vec<_> = scene
+                .sprites
+                .iter()
+                .copied()
+                .map(|sprite| {
+                    SpriteInstance::from_sprite(sprite, self.config.width, self.config.height)
+                })
+                .collect();
+
+            let sprite_instance_buffer = if sprite_instances.is_empty() {
+                None
+            } else {
+                Some(
+                    self.device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("Xenon Sprite Instance Buffer"),
+                            contents: bytemuck::cast_slice(&sprite_instances),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        }),
+                )
+            };
+
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Xenon Clear Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -287,12 +273,18 @@ impl<'window> Renderer<'window> {
                 multiview_mask: None,
             });
 
-            render_pass.set_pipeline(&self.quad_pipeline);
-            render_pass.set_bind_group(0, &self.scene_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.quad_vertex_buffer.slice(..));
-            render_pass
-                .set_index_buffer(self.quad_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.quad_index_count, 0, 0..1);
+            if let Some(sprite_instance_buffer) = sprite_instance_buffer.as_ref() {
+                render_pass.set_pipeline(&self.quad_pipeline);
+                render_pass.set_vertex_buffer(0, self.quad_vertex_buffer.slice(..));
+                render_pass.set_vertex_buffer(1, sprite_instance_buffer.slice(..));
+                render_pass
+                    .set_index_buffer(self.quad_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                render_pass.draw_indexed(
+                    0..self.quad_index_count,
+                    0,
+                    0..sprite_instances.len() as u32,
+                );
+            }
         }
 
         self.queue.submit([encoder.finish()]);

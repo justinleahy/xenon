@@ -1,5 +1,11 @@
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct RenderScene {
-    pub player_position: [f32; 2],
-    pub player_size: [f32; 2],
+pub struct RenderSprite {
+    pub position: [f32; 2],
+    pub size: [f32; 2],
+    pub color: [f32; 4],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RenderScene<'a> {
+    pub sprites: &'a [RenderSprite],
 }

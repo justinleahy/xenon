@@ -1,6 +1,6 @@
 use engine::{
     EngineConfig, FixedTimestep, FpsCounter, FrameClock, FrameTiming, LifecycleEvent, RenderScene,
-    Renderer,
+    RenderSprite, Renderer,
 };
 use std::sync::Arc;
 use tracing::info;
@@ -38,6 +38,7 @@ pub struct InputState {
     move_left: bool,
     move_right: bool,
     reset_requested: bool,
+    quit_requested: bool,
 }
 
 impl SandboxApp {
@@ -119,16 +120,23 @@ impl SandboxApp {
 
         let size = window.inner_size();
 
+        let sprites = [
+            RenderSprite {
+                position: [150.0, 150.0],
+                size: [32.0, 32.0],
+                color: [0.0, 0.9, 0.55, 1.0],
+            },
+            RenderSprite {
+                position: self.state.player_position,
+                size: [32.0, 32.0],
+                color: [0.95, 0.9, 0.55, 1.0],
+            },
+        ];
+
         renderer.resize(size.width, size.height);
 
         renderer
-            .render(
-                self.config.clear_color,
-                RenderScene {
-                    player_position: self.state.player_position,
-                    player_size: [32.0, 32.0],
-                },
-            )
+            .render(self.config.clear_color, RenderScene { sprites: &sprites })
             .expect("failed to render frame");
     }
 
@@ -196,6 +204,12 @@ impl ApplicationHandler for SandboxApp {
                     self.fixed_update();
                 }
 
+                if self.input.quit_requested {
+                    info!(event = ?LifecycleEvent::Stopping, "application stopping");
+                    event_loop.exit();
+                    return;
+                }
+
                 self.render();
             }
 
@@ -222,6 +236,12 @@ impl ApplicationHandler for SandboxApp {
                     PhysicalKey::Code(KeyCode::KeyR) => {
                         if is_pressed {
                             self.input.reset_requested = true;
+                        }
+                    }
+
+                    PhysicalKey::Code(KeyCode::KeyQ) => {
+                        if is_pressed {
+                            self.input.quit_requested = true;
                         }
                     }
 

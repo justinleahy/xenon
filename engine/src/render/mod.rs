@@ -4,4 +4,4 @@ mod scene;
 
 pub use error::RenderError;
 pub use renderer::Renderer;
-pub use scene::RenderScene;
+pub use scene::{RenderScene, RenderSprite};
