@@ -1,5 +1,6 @@
-use engine::{EngineConfig, FixedTimestep, FpsCounter, FrameClock, FrameTiming, LifecycleEvent};
-use softbuffer::{Context, Surface};
+use engine::{
+    EngineConfig, FixedTimestep, FpsCounter, FrameClock, FrameTiming, LifecycleEvent, Renderer,
+};
 use std::sync::Arc;
 use tracing::info;
 use winit::{
@@ -19,8 +20,7 @@ pub struct SandboxApp {
     pub state: SandboxState,
     pub input: InputState,
     pub window: Option<Arc<Window>>,
-    pub context: Option<Context<Arc<Window>>>,
-    pub surface: Option<Surface<Arc<Window>, Arc<Window>>>,
+    pub renderer: Option<Renderer<'static>>,
 }
 
 #[derive(Default)]
@@ -49,8 +49,7 @@ impl SandboxApp {
             state: SandboxState::default(),
             input: InputState::default(),
             window: None,
-            context: None,
-            surface: None,
+            renderer: None,
         }
     }
 
@@ -113,46 +112,17 @@ impl SandboxApp {
             return;
         };
 
-        let Some(surface) = self.surface.as_mut() else {
+        let Some(renderer) = self.renderer.as_mut() else {
             return;
         };
 
         let size = window.inner_size();
 
-        if size.width == 0 || size.height == 0 {
-            return;
-        }
+        renderer.resize(size.width, size.height);
 
-        surface
-            .resize(
-                std::num::NonZeroU32::new(size.width).unwrap(),
-                std::num::NonZeroU32::new(size.height).unwrap(),
-            )
-            .expect("failed to resize surface");
-
-        let mut buffer = surface.buffer_mut().expect("failed to get buffer");
-
-        let clear_color = clear_color_to_softbuffer_pixel(self.config.clear_color);
-
-        for pixel in buffer.iter_mut() {
-            *pixel = clear_color;
-        }
-
-        let player_x = (size.width as f32 * 0.5 + self.state.player_position[0]).round() as i32;
-        let player_y = (size.height as f32 * 0.5 + self.state.player_position[1]).round() as i32;
-
-        draw_filled_rect(
-            &mut buffer,
-            size.width,
-            size.height,
-            player_x - 8,
-            player_y - 8,
-            16,
-            16,
-            0x00f0e68c,
-        );
-
-        buffer.present().expect("failed to present buffer");
+        renderer
+            .render(self.config.clear_color)
+            .expect("failed to render frame");
     }
 
     fn log_frame_metrics(&mut self, timing: FrameTiming) {
@@ -187,13 +157,13 @@ impl ApplicationHandler for SandboxApp {
                 .expect("failed to create window"),
         );
 
-        let context = Context::new(window.clone()).expect("failed to create softbuffer context");
-        let surface =
-            Surface::new(&context, window.clone()).expect("failed to create softbuffer surface");
+        let size = window.inner_size();
+
+        let renderer = pollster::block_on(Renderer::new(window.clone(), size.width, size.height))
+            .expect("failed to create renderer");
 
         self.window = Some(window);
-        self.context = Some(context);
-        self.surface = Some(surface);
+        self.renderer = Some(renderer);
 
         info!(event = ?LifecycleEvent::Started, "application started");
     }
@@ -243,7 +213,9 @@ impl ApplicationHandler for SandboxApp {
                     }
 
                     PhysicalKey::Code(KeyCode::KeyR) => {
-                        self.input.reset_requested = is_pressed;
+                        if is_pressed {
+                            self.input.reset_requested = true;
+                        }
                     }
 
                     _ => {}
@@ -257,35 +229,6 @@ impl ApplicationHandler for SandboxApp {
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         if let Some(window) = &self.window {
             window.request_redraw();
-        }
-    }
-}
-
-fn clear_color_to_softbuffer_pixel([r, g, b, _a]: [u8; 4]) -> u32 {
-    ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
-}
-
-fn draw_filled_rect(
-    buffer: &mut [u32],
-    buffer_width: u32,
-    buffer_height: u32,
-    x: i32,
-    y: i32,
-    width: u32,
-    height: u32,
-    color: u32,
-) {
-    let min_x = x.max(0) as u32;
-    let min_y = y.max(0) as u32;
-
-    let max_x = (x + width as i32).clamp(0, buffer_width as i32) as u32;
-    let max_y = (y + height as i32).clamp(0, buffer_height as i32) as u32;
-
-    for py in min_y..max_y {
-        let row_start = (py * buffer_width) as usize;
-
-        for px in min_x..max_x {
-            buffer[row_start + px as usize] = color;
         }
     }
 }
