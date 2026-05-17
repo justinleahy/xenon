@@ -16,6 +16,8 @@ pub fn build_render_sprites(state: &SandboxState) -> Vec<RenderSprite> {
         });
     }
 
+    append_health_bar_sprites(&mut sprites, state);
+
     sprites.push(RenderSprite {
         position: state.player_position,
         size: [1.0, 1.0],
@@ -68,4 +70,46 @@ fn append_grid_sprites(sprites: &mut Vec<RenderSprite>, camera_position: [f32; 2
             color: if y == 0 { axis_color } else { grid_color },
         })
     }
+}
+
+fn append_health_bar_sprites(sprites: &mut Vec<RenderSprite>, state: &SandboxState) {
+    let max_health = 100.0;
+    let health_fraction = (state.player_health / max_health).clamp(0.0, 1.0);
+
+    let camera_position = state.player_position;
+
+    let bar_width = 8.0;
+    let bar_height = 0.35;
+    let bar_offset = [-17.0, -10.0];
+
+    let bar_center = [
+        camera_position[0] + bar_offset[0],
+        camera_position[1] + bar_offset[1],
+    ];
+
+    sprites.push(RenderSprite {
+        position: bar_center,
+        size: [bar_width, bar_height],
+        color: [0.18, 0.08, 0.08, 1.0],
+    });
+
+    let fill_width = bar_width * health_fraction;
+    let fill_center = [
+        bar_center[0] - (bar_width - fill_width) * 0.5,
+        bar_center[1],
+    ];
+
+    let fill_color = if health_fraction > 0.5 {
+        [0.25, 0.9, 0.35, 1.0]
+    } else if health_fraction > 0.25 {
+        [0.95, 0.75, 0.25, 1.0]
+    } else {
+        [0.95, 0.25, 0.25, 1.0]
+    };
+
+    sprites.push(RenderSprite {
+        position: fill_center,
+        size: [fill_width, bar_height],
+        color: fill_color,
+    });
 }
