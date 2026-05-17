@@ -6,17 +6,21 @@ const PIXELS_PER_WORLD_UNIT: f32 = 32.0;
 pub fn build_render_sprites(state: &SandboxState) -> Vec<RenderSprite> {
     let mut sprites = Vec::new();
 
-    append_grid_sprites(&mut sprites, state.player_position, 20);
+    append_grid_sprites(&mut sprites, state.player_position(), 20);
 
-    for enemy in &state.enemies {
+    for enemy in &state.scene.enemies {
+        let Some(transform) = state.scene.transform(*enemy) else {
+            continue;
+        };
+
         sprites.push(RenderSprite {
-            position: enemy.position,
+            position: transform.position,
             size: [1.0, 1.0],
             color: [0.9, 0.35, 0.55, 1.0],
         });
     }
 
-    for projectile in &state.projectiles {
+    for projectile in &state.combat_state.projectiles {
         sprites.push(RenderSprite {
             position: projectile.position,
             size: [0.25, 0.25],
@@ -27,7 +31,7 @@ pub fn build_render_sprites(state: &SandboxState) -> Vec<RenderSprite> {
     append_health_bar_sprites(&mut sprites, state);
 
     sprites.push(RenderSprite {
-        position: state.player_position,
+        position: state.player_position(),
         size: [1.0, 1.0],
         color: [0.95, 0.9, 0.55, 1.0],
     });
@@ -41,7 +45,7 @@ pub fn build_render_scene<'a>(
 ) -> RenderScene<'a> {
     RenderScene {
         camera: RenderCamera {
-            position: state.player_position,
+            position: state.player_position(),
             pixels_per_world_unit: PIXELS_PER_WORLD_UNIT,
         },
         sprites,
@@ -82,9 +86,9 @@ fn append_grid_sprites(sprites: &mut Vec<RenderSprite>, camera_position: [f32; 2
 
 fn append_health_bar_sprites(sprites: &mut Vec<RenderSprite>, state: &SandboxState) {
     let max_health = 100.0;
-    let health_fraction = (state.player_health / max_health).clamp(0.0, 1.0);
+    let health_fraction = (state.player_health() / max_health).clamp(0.0, 1.0);
 
-    let camera_position = state.player_position;
+    let camera_position = state.player_position();
 
     let bar_width = 8.0;
     let bar_height = 0.35;

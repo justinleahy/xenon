@@ -1,3 +1,4 @@
+mod game;
 mod input;
 mod render_scene;
 mod state;
