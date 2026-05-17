@@ -1,7 +1,4 @@
-use super::game::{
-    CombatState, EnemyState, GameCatalog, PlayerController, PlayerProgression, Scene,
-    SceneDefinition,
-};
+use super::game::{GameCatalog, GameSystems, Scene, SceneDefinition};
 use super::input::InputState;
 use std::path::Path;
 use tracing::info;
@@ -11,10 +8,7 @@ pub struct SandboxState {
     pub fixed_updates: u64,
     pub scene: Scene,
     pub initial_scene_definition: SceneDefinition,
-    pub combat_state: CombatState,
-    pub enemy_state: EnemyState,
-    pub player_controller: PlayerController,
-    pub player_progression: PlayerProgression,
+    pub systems: GameSystems,
     pub game_catalog: GameCatalog,
 }
 
@@ -34,10 +28,7 @@ impl SandboxState {
             fixed_updates: 0,
             scene: scene_definition.build_scene(&game_catalog),
             initial_scene_definition: scene_definition,
-            combat_state: CombatState::default(),
-            enemy_state: EnemyState::default(),
-            player_controller: PlayerController::default(),
-            player_progression: PlayerProgression::default(),
+            systems: GameSystems::default(),
             game_catalog,
         }
     }
@@ -65,30 +56,13 @@ impl SandboxState {
             return;
         }
 
-        let movement = movement_from_input(input);
-
-        self.player_controller
-            .fixed_update(&mut self.scene, movement, delta_secs);
-
-        let player_position = self.player_position();
-
-        self.enemy_state.fixed_update(
+        self.systems.fixed_update(
             &mut self.scene,
             &self.game_catalog,
-            player_position,
+            input,
             self.fixed_updates,
             delta_secs,
         );
-
-        self.combat_state.fixed_update(
-            &mut self.scene,
-            &self.game_catalog,
-            player_position,
-            delta_secs,
-        );
-
-        self.player_progression
-            .fixed_update(&mut self.scene, player_position);
 
         self.fixed_updates += 1;
         self.simulation_time_secs += delta_secs as f64;
@@ -106,7 +80,7 @@ impl SandboxState {
                 enemies = self.scene.enemies.len(),
                 projectiles = self.scene.projectiles.len(),
                 health = self.player_health(),
-                experience = self.player_progression.experience,
+                experience = self.systems.player_progression.experience,
                 "sandbox state"
             )
         }
@@ -125,35 +99,6 @@ impl SandboxState {
             .map(|health| health.current)
             .unwrap_or(0.0)
     }
-}
-
-fn movement_from_input(input: &InputState) -> [f32; 2] {
-    let mut direction = [0.0_f32, 0.0_f32];
-
-    if input.move_up {
-        direction[1] -= 1.0;
-    }
-
-    if input.move_down {
-        direction[1] += 1.0;
-    }
-
-    if input.move_left {
-        direction[0] -= 1.0;
-    }
-
-    if input.move_right {
-        direction[0] += 1.0;
-    }
-
-    let length = (direction[0] * direction[0] + direction[1] * direction[1]).sqrt();
-
-    if length > 0.0 {
-        direction[0] /= length;
-        direction[1] /= length;
-    }
-
-    direction
 }
 
 #[cfg(test)]

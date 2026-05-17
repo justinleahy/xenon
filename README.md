@@ -18,7 +18,7 @@ Implemented so far:
 - `wgpu` clear pass and instanced 2D quad rendering.
 - Camera-following sprite scene.
 - Debug grid and player health bar.
-- Basic entity IDs, component storage, and gameplay systems.
+- Basic entity IDs, component storage, and scheduled gameplay systems.
 - Data-driven rendering through `Transform` and `Sprite` components.
 - Demo scene loading from `sandbox/config/demo_scene.toml`.
 - Circle-collider based projectile hits and enemy contact damage.
@@ -62,7 +62,7 @@ cargo fmt --check
 cargo test
 ```
 
-The current test suite covers runtime configuration, frame timing, fixed timestep behavior, scene/component invariants, scene definition loading/saving, render-scene conversion, combat, enemies, player movement, pickups, and player progression.
+The current test suite covers runtime configuration, frame timing, fixed timestep behavior, scene/component invariants, scene definition loading/saving, render-scene conversion, combat, enemies, player movement, pickups, player progression, and game-system scheduling.
 
 ## Development Notes
 
