@@ -1,6 +1,8 @@
 use super::components::PickupReward;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EnemyKind {
     Basic,
 }
@@ -16,7 +18,8 @@ pub struct EnemyDefinition {
     pub death_reward: PickupReward,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum WeaponKind {
     Wand,
 }

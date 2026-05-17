@@ -1,13 +1,16 @@
 use super::game::{
     CombatState, EnemyState, GameCatalog, PlayerController, PlayerProgression, Scene,
+    SceneDefinition,
 };
 use super::input::InputState;
+use std::path::Path;
 use tracing::info;
 
 pub struct SandboxState {
     pub simulation_time_secs: f64,
     pub fixed_updates: u64,
     pub scene: Scene,
+    pub initial_scene_definition: SceneDefinition,
     pub combat_state: CombatState,
     pub enemy_state: EnemyState,
     pub player_controller: PlayerController,
@@ -18,11 +21,19 @@ pub struct SandboxState {
 impl Default for SandboxState {
     fn default() -> Self {
         let game_catalog = GameCatalog::default();
+        let scene_definition = SceneDefinition::survivor_demo();
 
+        Self::new(scene_definition, game_catalog)
+    }
+}
+
+impl SandboxState {
+    pub fn new(scene_definition: SceneDefinition, game_catalog: GameCatalog) -> Self {
         Self {
             simulation_time_secs: 0.0,
             fixed_updates: 0,
-            scene: Scene::new_survivor_demo(&game_catalog),
+            scene: scene_definition.build_scene(&game_catalog),
+            initial_scene_definition: scene_definition,
             combat_state: CombatState::default(),
             enemy_state: EnemyState::default(),
             player_controller: PlayerController::default(),
@@ -30,12 +41,24 @@ impl Default for SandboxState {
             game_catalog,
         }
     }
-}
 
-impl SandboxState {
+    pub fn load_from_scene_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let game_catalog = GameCatalog::default();
+        let scene_definition = SceneDefinition::load_from_file(path)?;
+
+        Ok(Self::new(scene_definition, game_catalog))
+    }
+
+    pub fn reset(&mut self) {
+        let scene_definition = self.initial_scene_definition.clone();
+        let game_catalog = self.game_catalog;
+
+        *self = Self::new(scene_definition, game_catalog);
+    }
+
     pub fn fixed_update(&mut self, input: &mut InputState, delta_secs: f32) {
         if input.reset_requested {
-            *self = Self::default();
+            self.reset();
             input.reset_requested = false;
 
             info!("simulation reset");
@@ -131,4 +154,45 @@ fn movement_from_input(input: &InputState) -> [f32; 2] {
     }
 
     direction
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::game::{EnemyKind, EnemySpawnDefinition, PlayerSceneDefinition};
+
+    #[test]
+    fn test_reset_restores_initial_scene_definition() {
+        let catalog = GameCatalog::default();
+        let scene_definition = SceneDefinition {
+            player: PlayerSceneDefinition {
+                position: [3.0, 4.0],
+            },
+            enemies: vec![EnemySpawnDefinition {
+                kind: EnemyKind::Basic,
+                position: [6.0, 7.0],
+            }],
+        };
+        let mut state = SandboxState::new(scene_definition, catalog);
+
+        state
+            .scene
+            .transform_mut(state.scene.player)
+            .unwrap()
+            .position = [99.0, 99.0];
+        state.scene.enemies.clear();
+
+        state.reset();
+
+        assert_eq!(state.player_position(), [3.0, 4.0]);
+        assert_eq!(state.scene.enemies.len(), 1);
+        assert_eq!(
+            state
+                .scene
+                .transform(*state.scene.enemies.first().unwrap())
+                .unwrap()
+                .position,
+            [6.0, 7.0]
+        );
+    }
 }

@@ -5,6 +5,7 @@ pub mod enemies;
 pub mod entity;
 pub mod player;
 pub mod scene;
+pub mod scene_definition;
 
 #[cfg(test)]
 pub mod test_helpers;
@@ -14,3 +15,4 @@ pub use combat::CombatState;
 pub use enemies::EnemyState;
 pub use player::{PlayerController, PlayerProgression};
 pub use scene::Scene;
+pub use scene_definition::{EnemySpawnDefinition, PlayerSceneDefinition, SceneDefinition};

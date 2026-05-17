@@ -17,7 +17,7 @@ fn main() -> anyhow::Result<()> {
     info!(?config, "runtime config loaded");
 
     let event_loop = EventLoop::new()?;
-    let mut app = SandboxApp::new(config);
+    let mut app = SandboxApp::new(config)?;
 
     event_loop.run_app(&mut app)?;
 

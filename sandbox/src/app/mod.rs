@@ -33,17 +33,17 @@ pub struct SandboxApp {
 }
 
 impl SandboxApp {
-    pub fn new(config: EngineConfig) -> Self {
-        Self {
+    pub fn new(config: EngineConfig) -> anyhow::Result<Self> {
+        Ok(Self {
             config,
             frame_clock: FrameClock::new(),
             fixed_timestep: FixedTimestep::default(),
             fps_counter: FpsCounter::default(),
-            state: SandboxState::default(),
+            state: SandboxState::load_from_scene_file("sandbox/config/demo_scene.toml")?,
             input: InputState::default(),
             window: None,
             renderer: None,
-        }
+        })
     }
 
     fn fixed_update(&mut self) {
