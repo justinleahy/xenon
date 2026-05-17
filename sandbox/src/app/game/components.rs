@@ -31,3 +31,18 @@ pub struct CircleCollider {
 pub struct Damage {
     pub amount: f32,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PickupReward {
+    Experience(u32),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DeathDrop {
+    pub reward: PickupReward,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Pickup {
+    pub reward: PickupReward,
+}

@@ -136,6 +136,13 @@ impl CombatState {
         hit_projectiles.dedup();
 
         for enemy in defeated_enemies {
+            let position = scene.transform(enemy).map(|transform| transform.position);
+            let reward = scene.death_drop(enemy).map(|death_drop| death_drop.reward);
+
+            if let (Some(position), Some(reward)) = (position, reward) {
+                scene.spawn_pickup(position, reward);
+            }
+
             scene.despawn_entity(enemy);
         }
 
@@ -205,6 +212,8 @@ mod tests {
             .circle_colliders
             .retain(|(entity, _)| *entity == scene.player);
         scene.damage.clear();
+        scene.death_drops.clear();
+        scene.pickups.clear();
 
         scene
     }
@@ -222,6 +231,7 @@ mod tests {
             .find_map(|(entity, projectile)| (*entity == projectile_entity).then_some(projectile))
             .unwrap()
             .previous_position = [0.0, 0.0];
+        scene.damage_mut(projectile_entity).unwrap().amount = 20.0;
 
         let mut combat = CombatState::default();
 
@@ -233,6 +243,11 @@ mod tests {
                 .projectiles
                 .iter()
                 .any(|(entity, _)| *entity == projectile_entity)
+        );
+        assert_eq!(scene.pickups.len(), 1);
+        assert_eq!(
+            scene.pickups[0].1.reward,
+            super::super::components::PickupReward::Experience(1)
         );
     }
 
@@ -283,13 +298,14 @@ mod tests {
         combat.resolve_projectile_hits(&mut scene);
 
         assert!(scene.enemies.contains(&enemy));
-        assert_eq!(scene.health(enemy).unwrap().current, 5.0);
+        assert_eq!(scene.health(enemy).unwrap().current, 15.0);
         assert!(
             !scene
                 .projectiles
                 .iter()
                 .any(|(entity, _)| *entity == projectile_entity)
         );
+        assert!(scene.pickups.is_empty());
     }
 
     #[test]

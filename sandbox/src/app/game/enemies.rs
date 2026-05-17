@@ -133,6 +133,8 @@ mod tests {
             .circle_colliders
             .retain(|(entity, _)| *entity == scene.player);
         scene.damage.clear();
+        scene.death_drops.clear();
+        scene.pickups.clear();
 
         scene
     }

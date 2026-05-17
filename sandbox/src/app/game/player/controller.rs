@@ -1,4 +1,4 @@
-use super::Scene;
+use super::super::Scene;
 
 #[derive(Default)]
 pub struct PlayerController;

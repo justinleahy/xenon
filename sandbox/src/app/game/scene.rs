@@ -1,5 +1,9 @@
+use crate::app::game::components::PickupReward;
+
 use super::{
-    components::{CircleCollider, Damage, Health, Projectile, Sprite, Transform},
+    components::{
+        CircleCollider, Damage, DeathDrop, Health, Pickup, Projectile, Sprite, Transform,
+    },
     entity::EntityId,
 };
 
@@ -13,6 +17,8 @@ pub struct Scene {
     pub projectiles: Vec<(EntityId, Projectile)>,
     pub circle_colliders: Vec<(EntityId, CircleCollider)>,
     pub damage: Vec<(EntityId, Damage)>,
+    pub death_drops: Vec<(EntityId, DeathDrop)>,
+    pub pickups: Vec<(EntityId, Pickup)>,
 }
 
 impl Scene {
@@ -27,6 +33,8 @@ impl Scene {
             projectiles: Vec::new(),
             circle_colliders: Vec::new(),
             damage: Vec::new(),
+            death_drops: Vec::new(),
+            pickups: Vec::new(),
         };
 
         let player = scene.spawn_entity();
@@ -74,6 +82,8 @@ impl Scene {
         self.projectiles.retain(|(id, _)| *id != entity);
         self.circle_colliders.retain(|(id, _)| *id != entity);
         self.damage.retain(|(id, _)| *id != entity);
+        self.death_drops.retain(|(id, _)| *id != entity);
+        self.pickups.retain(|(id, _)| *id != entity);
     }
 
     pub fn spawn_enemy(&mut self, position: [f32; 2]) -> EntityId {
@@ -95,6 +105,12 @@ impl Scene {
             Health {
                 current: 20.0,
                 max: 20.0,
+            },
+        ));
+        self.death_drops.push((
+            enemy,
+            DeathDrop {
+                reward: PickupReward::Experience(1),
             },
         ));
 
@@ -125,6 +141,24 @@ impl Scene {
         self.damage.push((projectile, Damage { amount: 10.0 }));
 
         projectile
+    }
+
+    pub fn spawn_pickup(&mut self, position: [f32; 2], reward: PickupReward) -> EntityId {
+        let pickup = self.spawn_entity();
+
+        self.transforms.push((pickup, Transform { position }));
+        self.sprites.push((
+            pickup,
+            Sprite {
+                size: [0.25, 0.25],
+                color: [0.45, 1.0, 0.55, 1.0],
+            },
+        ));
+        self.circle_colliders
+            .push((pickup, CircleCollider { radius: 0.25 }));
+        self.pickups.push((pickup, Pickup { reward }));
+
+        pickup
     }
 
     pub fn transform(&self, entity: EntityId) -> Option<&Transform> {
@@ -186,6 +220,18 @@ impl Scene {
             .iter_mut()
             .find_map(|(id, damage)| (*id == entity).then_some(damage))
     }
+
+    pub fn death_drop(&self, entity: EntityId) -> Option<&DeathDrop> {
+        self.death_drops
+            .iter()
+            .find_map(|(id, drop)| (*id == entity).then_some(drop))
+    }
+
+    pub fn pickup(&self, entity: EntityId) -> Option<&Pickup> {
+        self.pickups
+            .iter()
+            .find_map(|(id, pickup)| (*id == entity).then_some(pickup))
+    }
 }
 
 #[cfg(test)]
@@ -206,6 +252,8 @@ mod tests {
             .circle_colliders
             .retain(|(entity, _)| *entity == scene.player);
         scene.damage.clear();
+        scene.death_drops.clear();
+        scene.pickups.clear();
 
         scene
     }
@@ -245,8 +293,14 @@ mod tests {
         assert_eq!(
             scene.health(enemy).unwrap(),
             &Health {
-                current: 10.0,
-                max: 10.0,
+                current: 20.0,
+                max: 20.0,
+            }
+        );
+        assert_eq!(
+            scene.death_drop(enemy).unwrap(),
+            &DeathDrop {
+                reward: PickupReward::Experience(1),
             }
         );
     }
@@ -287,19 +341,48 @@ mod tests {
     }
 
     #[test]
+    fn test_spawn_pickup_creates_transform_sprite_collider_and_pickup_component() {
+        let mut scene = scene_with_only_player();
+
+        let pickup = scene.spawn_pickup([2.0, 3.0], PickupReward::Experience(7));
+
+        assert_eq!(scene.transform(pickup).unwrap().position, [2.0, 3.0]);
+        assert_eq!(
+            scene.sprite(pickup).unwrap(),
+            &Sprite {
+                size: [0.25, 0.25],
+                color: [0.45, 1.0, 0.55, 1.0],
+            }
+        );
+        assert_eq!(
+            scene.circle_collider(pickup).unwrap(),
+            &CircleCollider { radius: 0.25 }
+        );
+        assert_eq!(
+            scene.pickup(pickup).unwrap(),
+            &Pickup {
+                reward: PickupReward::Experience(7),
+            }
+        );
+    }
+
+    #[test]
     fn test_despawn_entity_removes_components_and_tags() {
         let mut scene = scene_with_only_player();
 
         let enemy = scene.spawn_enemy([3.0, 4.0]);
         let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0]);
+        let pickup = scene.spawn_pickup([2.0, 3.0], PickupReward::Experience(7));
 
         scene.despawn_entity(enemy);
         scene.despawn_entity(projectile);
+        scene.despawn_entity(pickup);
 
         assert!(scene.transform(enemy).is_none());
         assert!(scene.sprite(enemy).is_none());
         assert!(scene.circle_collider(enemy).is_none());
         assert!(scene.health(enemy).is_none());
+        assert!(scene.death_drop(enemy).is_none());
         assert!(!scene.enemies.contains(&enemy));
 
         assert!(scene.transform(projectile).is_none());
@@ -312,6 +395,11 @@ mod tests {
                 .iter()
                 .any(|(entity, _)| *entity == projectile)
         );
+
+        assert!(scene.transform(pickup).is_none());
+        assert!(scene.sprite(pickup).is_none());
+        assert!(scene.circle_collider(pickup).is_none());
+        assert!(scene.pickup(pickup).is_none());
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use super::game::{CombatState, EnemyState, PlayerController, Scene};
+use super::game::{CombatState, EnemyState, PlayerController, PlayerProgression, Scene};
 use super::input::InputState;
 use tracing::info;
 
@@ -8,7 +8,8 @@ pub struct SandboxState {
     pub scene: Scene,
     pub combat_state: CombatState,
     pub enemy_state: EnemyState,
-    pub player: PlayerController,
+    pub player_controller: PlayerController,
+    pub player_progression: PlayerProgression,
 }
 
 impl Default for SandboxState {
@@ -19,7 +20,8 @@ impl Default for SandboxState {
             scene: Scene::new_survivor_demo(),
             combat_state: CombatState::default(),
             enemy_state: EnemyState::default(),
-            player: PlayerController::default(),
+            player_controller: PlayerController::default(),
+            player_progression: PlayerProgression::default(),
         }
     }
 }
@@ -36,7 +38,7 @@ impl SandboxState {
 
         let movement = movement_from_input(input);
 
-        self.player
+        self.player_controller
             .fixed_update(&mut self.scene, movement, delta_secs);
 
         let player_position = self.player_position();
@@ -50,6 +52,9 @@ impl SandboxState {
 
         self.combat_state
             .fixed_update(&mut self.scene, player_position, delta_secs);
+
+        self.player_progression
+            .fixed_update(&mut self.scene, player_position);
 
         self.fixed_updates += 1;
         self.simulation_time_secs += delta_secs as f64;
@@ -67,7 +72,8 @@ impl SandboxState {
                 enemies = self.scene.enemies.len(),
                 projectiles = self.scene.projectiles.len(),
                 health = self.player_health(),
-                "scene state"
+                experience = self.player_progression.experience,
+                "sandbox state"
             )
         }
     }

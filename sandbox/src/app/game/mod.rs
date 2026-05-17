@@ -7,5 +7,5 @@ pub mod scene;
 
 pub use combat::CombatState;
 pub use enemies::EnemyState;
-pub use player::PlayerController;
+pub use player::{PlayerController, PlayerProgression};
 pub use scene::Scene;
