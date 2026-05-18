@@ -91,6 +91,18 @@ impl AssetManager {
         })
     }
 
+    pub fn load_texture_bytes(&self, id: &AssetId) -> Result<Vec<u8>, AssetError> {
+        let path = self
+            .texture_file_path(id)
+            .ok_or_else(|| AssetError::MissingAsset { id: id.clone() })?;
+
+        fs::read(&path).map_err(|source| AssetError::AssetRead {
+            id: id.clone(),
+            path,
+            source,
+        })
+    }
+
     pub fn manifest(&self) -> &AssetManifest {
         &self.manifest
     }
@@ -299,6 +311,57 @@ mod tests {
             AssetError::AssetRead { id, path, source } => {
                 assert_eq!(id, AssetId::new("shaders/colored"));
                 assert_eq!(path, asset_root.join("shaders/colored.wgsl"));
+                assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
+            }
+            _ => panic!("expected asset read error"),
+        }
+    }
+
+    #[test]
+    fn test_load_texture_bytes_reads_known_texture() {
+        let asset_root = temp_asset_root("texture-bytes");
+        let texture_dir = asset_root.join("textures");
+        fs::create_dir_all(&texture_dir).unwrap();
+        fs::write(texture_dir.join("player.png"), &[0x89, b'P', b'N', b'G']).unwrap();
+
+        let manager = AssetManager::with_root(test_manifest(), asset_root);
+
+        let bytes = manager
+            .load_texture_bytes(&AssetId::new("textures/player"))
+            .unwrap();
+
+        assert_eq!(bytes, vec![0x89, b'P', b'N', b'G']);
+    }
+
+    #[test]
+    fn test_load_texture_bytes_returns_missing_asset_error() {
+        let manager = AssetManager::new(test_manifest());
+
+        let error = manager
+            .load_texture_bytes(&AssetId::new("textures/missing"))
+            .unwrap_err();
+
+        match error {
+            AssetError::MissingAsset { id } => {
+                assert_eq!(id, AssetId::new("textures/missing"));
+            }
+            _ => panic!("expected missing asset error"),
+        }
+    }
+
+    #[test]
+    fn test_load_texture_bytes_returns_read_error_for_missing_file() {
+        let asset_root = temp_asset_root("missing-texture-file");
+        let manager = AssetManager::with_root(test_manifest(), asset_root.clone());
+
+        let error = manager
+            .load_texture_bytes(&AssetId::new("textures/player"))
+            .unwrap_err();
+
+        match error {
+            AssetError::AssetRead { id, path, source } => {
+                assert_eq!(id, AssetId::new("textures/player"));
+                assert_eq!(path, asset_root.join("textures/player.png"));
                 assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
             }
             _ => panic!("expected asset read error"),
