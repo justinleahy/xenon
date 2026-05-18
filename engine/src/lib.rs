@@ -1,3 +1,4 @@
+pub mod assets;
 pub mod render;
 pub mod runtime;
 pub mod scene;
@@ -10,3 +11,5 @@ pub use runtime::{
 };
 
 pub use scene::{EntityId, SceneObjectId, Sprite, Transform};
+
+pub use assets::{AssetId, Handle, ShaderAsset, TextureAsset};
