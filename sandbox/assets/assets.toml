@@ -1,0 +1,3 @@
+[[shaders]]
+id = "shaders/colored"
+path = "shaders/colored.wgsl"

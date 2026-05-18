@@ -8,7 +8,10 @@ use self::{
     render_scene::{build_render_scene, build_render_sprites},
     state::SandboxState,
 };
-use std::sync::Arc;
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tracing::info;
 use winit::{
     application::ApplicationHandler,
@@ -17,8 +20,21 @@ use winit::{
     window::{Window, WindowId},
 };
 use xenon_engine::{
-    EngineConfig, FixedTimestep, FpsCounter, FrameClock, FrameTiming, LifecycleEvent, Renderer,
+    AssetId, AssetManager, EngineConfig, FixedTimestep, FpsCounter, FrameClock, FrameTiming,
+    LifecycleEvent, Renderer,
 };
+
+fn sandbox_path(path: impl AsRef<Path>) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(path)
+}
+
+fn asset_manifest_path() -> PathBuf {
+    sandbox_path("assets/assets.toml")
+}
+
+fn demo_scene_path() -> PathBuf {
+    sandbox_path("config/demo_scene.toml")
+}
 
 #[derive(Default)]
 pub struct SandboxApp {
@@ -30,19 +46,24 @@ pub struct SandboxApp {
     pub input: InputState,
     pub window: Option<Arc<Window>>,
     pub renderer: Option<Renderer<'static>>,
+    pub shader_source: String,
 }
 
 impl SandboxApp {
     pub fn new(config: EngineConfig) -> anyhow::Result<Self> {
+        let assets = AssetManager::load_manifest(asset_manifest_path())?;
+        let shader_source = assets.load_shader_source(&AssetId::new("shaders/colored"))?;
+
         Ok(Self {
             config,
             frame_clock: FrameClock::new(),
             fixed_timestep: FixedTimestep::default(),
             fps_counter: FpsCounter::default(),
-            state: SandboxState::load_from_scene_file("sandbox/config/demo_scene.toml")?,
+            state: SandboxState::load_from_scene_file(demo_scene_path())?,
             input: InputState::default(),
             window: None,
             renderer: None,
+            shader_source,
         })
     }
 
@@ -88,6 +109,35 @@ impl SandboxApp {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_loads_shader_source_from_asset_manifest() {
+        let app = SandboxApp::new(EngineConfig::default()).unwrap();
+
+        assert_eq!(
+            app.shader_source,
+            include_str!("../../assets/shaders/colored.wgsl")
+        );
+    }
+
+    #[test]
+    fn test_new_initializes_without_window_or_renderer() {
+        let app = SandboxApp::new(EngineConfig::default()).unwrap();
+
+        assert!(app.window.is_none());
+        assert!(app.renderer.is_none());
+    }
+
+    #[test]
+    fn test_sandbox_asset_and_scene_paths_exist() {
+        assert!(asset_manifest_path().is_file());
+        assert!(demo_scene_path().is_file());
+    }
+}
+
 impl ApplicationHandler for SandboxApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let attrs = Window::default_attributes()
@@ -106,8 +156,13 @@ impl ApplicationHandler for SandboxApp {
 
         let size = window.inner_size();
 
-        let renderer = pollster::block_on(Renderer::new(window.clone(), size.width, size.height))
-            .expect("failed to create renderer");
+        let renderer = pollster::block_on(Renderer::new_with_shader_source(
+            window.clone(),
+            size.width,
+            size.height,
+            &self.shader_source,
+        ))
+        .expect("failed to create renderer");
 
         self.window = Some(window);
         self.renderer = Some(renderer);

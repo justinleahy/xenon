@@ -115,6 +115,16 @@ impl<'window> Renderer<'window> {
         width: u32,
         height: u32,
     ) -> Result<Self, RenderError> {
+        Self::new_with_shader_source(window, width, height, include_str!("shaders/colored.wgsl"))
+            .await
+    }
+
+    pub async fn new_with_shader_source(
+        window: impl Into<wgpu::SurfaceTarget<'window>>,
+        width: u32,
+        height: u32,
+        shader_source: &str,
+    ) -> Result<Self, RenderError> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
         let surface = instance.create_surface(window)?;
 
@@ -147,7 +157,7 @@ impl<'window> Renderer<'window> {
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Xenon Triangle Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/colored.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
