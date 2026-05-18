@@ -51,8 +51,10 @@ pub struct SandboxApp {
 
 impl SandboxApp {
     pub fn new(config: EngineConfig) -> anyhow::Result<Self> {
-        let assets = AssetManager::load_manifest(asset_manifest_path())?;
-        let shader_source = assets.load_shader_source(&AssetId::new("shaders/colored"))?;
+        let mut assets = AssetManager::load_manifest(asset_manifest_path())?;
+        let shader_source = assets
+            .load_shader_source(&AssetId::new("shaders/colored"))?
+            .to_string();
 
         Ok(Self {
             config,

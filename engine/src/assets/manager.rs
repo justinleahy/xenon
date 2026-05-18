@@ -2,11 +2,13 @@ use super::{
     AssetError, AssetId, AssetManifest, Handle, ShaderAsset, ShaderAssetEntry, TextureAsset,
     TextureAssetEntry, TextureData,
 };
-use std::{fs, path::PathBuf};
+use std::{collections::HashMap, fs, path::PathBuf};
 
 pub struct AssetManager {
     manifest: AssetManifest,
     asset_root: PathBuf,
+    shader_cache: HashMap<AssetId, String>,
+    texture_cache: HashMap<AssetId, TextureData>,
 }
 
 impl AssetManager {
@@ -18,6 +20,8 @@ impl AssetManager {
         Self {
             manifest,
             asset_root: asset_root.into(),
+            shader_cache: HashMap::new(),
+            texture_cache: HashMap::new(),
         }
     }
 
@@ -79,31 +83,25 @@ impl AssetManager {
         self.shader_path(id).map(|path| self.asset_root.join(path))
     }
 
-    pub fn load_shader_source(&self, id: &AssetId) -> Result<String, AssetError> {
-        let path = self
-            .shader_file_path(id)
-            .ok_or_else(|| AssetError::MissingAsset { id: id.clone() })?;
+    pub fn load_shader_source(&mut self, id: &AssetId) -> Result<&str, AssetError> {
+        if !self.shader_cache.contains_key(id) {
+            let shader = self.read_source_source(id)?;
+            self.shader_cache.insert(id.clone(), shader);
+        }
 
-        fs::read_to_string(&path).map_err(|source| AssetError::AssetRead {
-            id: id.clone(),
-            path,
-            source,
-        })
+        Ok(self.shader_cache.get(id).unwrap().as_str())
     }
 
-    pub fn load_texture_bytes(&self, id: &AssetId) -> Result<Vec<u8>, AssetError> {
-        let path = self
-            .texture_file_path(id)
-            .ok_or_else(|| AssetError::MissingAsset { id: id.clone() })?;
+    pub fn load_texture_data(&mut self, id: &AssetId) -> Result<&TextureData, AssetError> {
+        if !self.texture_cache.contains_key(id) {
+            let texture = self.read_texture_data(id)?;
+            self.texture_cache.insert(id.clone(), texture);
+        }
 
-        fs::read(&path).map_err(|source| AssetError::AssetRead {
-            id: id.clone(),
-            path,
-            source,
-        })
+        Ok(self.texture_cache.get(id).unwrap())
     }
 
-    pub fn load_texture_data(&self, id: &AssetId) -> Result<TextureData, AssetError> {
+    fn read_texture_data(&self, id: &AssetId) -> Result<TextureData, AssetError> {
         let path = self
             .texture_file_path(id)
             .ok_or_else(|| AssetError::MissingAsset { id: id.clone() })?;
@@ -128,6 +126,51 @@ impl AssetManager {
             height: rgba.height(),
             rgba: rgba.into_raw(),
         })
+    }
+
+    fn read_source_source(&self, id: &AssetId) -> Result<String, AssetError> {
+        let path = self
+            .shader_file_path(id)
+            .ok_or_else(|| AssetError::MissingAsset { id: id.clone() })?;
+
+        fs::read_to_string(&path).map_err(|source| AssetError::AssetRead {
+            id: id.clone(),
+            path,
+            source,
+        })
+    }
+
+    pub fn load_texture_bytes(&self, id: &AssetId) -> Result<Vec<u8>, AssetError> {
+        let path = self
+            .texture_file_path(id)
+            .ok_or_else(|| AssetError::MissingAsset { id: id.clone() })?;
+
+        fs::read(&path).map_err(|source| AssetError::AssetRead {
+            id: id.clone(),
+            path,
+            source,
+        })
+    }
+
+    pub fn unload_shader_source(&mut self, id: &AssetId) -> bool {
+        self.shader_cache.remove(id).is_some()
+    }
+
+    pub fn unload_texture_data(&mut self, id: &AssetId) -> bool {
+        self.texture_cache.remove(id).is_some()
+    }
+
+    pub fn unload_all(&mut self) {
+        self.shader_cache.clear();
+        self.texture_cache.clear();
+    }
+
+    pub fn cached_shader_count(&self) -> usize {
+        self.shader_cache.len()
+    }
+
+    pub fn cached_texture_count(&self) -> usize {
+        self.texture_cache.len()
     }
 
     pub fn manifest(&self) -> &AssetManifest {
@@ -300,7 +343,7 @@ mod tests {
         fs::create_dir_all(&shader_dir).unwrap();
         fs::write(shader_dir.join("colored.wgsl"), "fn vertex_main() {}\n").unwrap();
 
-        let manager = AssetManager::with_root(test_manifest(), asset_root);
+        let mut manager = AssetManager::with_root(test_manifest(), asset_root);
 
         let source = manager
             .load_shader_source(&AssetId::new("shaders/colored"))
@@ -311,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_load_shader_source_returns_missing_asset_error() {
-        let manager = AssetManager::new(test_manifest());
+        let mut manager = AssetManager::new(test_manifest());
 
         let error = manager
             .load_shader_source(&AssetId::new("shaders/missing"))
@@ -328,7 +371,7 @@ mod tests {
     #[test]
     fn test_load_shader_source_returns_read_error_for_missing_file() {
         let asset_root = temp_asset_root("missing-shader-file");
-        let manager = AssetManager::with_root(test_manifest(), asset_root.clone());
+        let mut manager = AssetManager::with_root(test_manifest(), asset_root.clone());
 
         let error = manager
             .load_shader_source(&AssetId::new("shaders/colored"))
@@ -404,7 +447,7 @@ mod tests {
         let image = image::RgbaImage::from_raw(2, 1, vec![255, 0, 0, 255, 0, 255, 0, 128]).unwrap();
         image.save(texture_dir.join("player.png")).unwrap();
 
-        let manager = AssetManager::with_root(test_manifest(), asset_root);
+        let mut manager = AssetManager::with_root(test_manifest(), asset_root);
 
         let texture = manager
             .load_texture_data(&AssetId::new("textures/player"))
@@ -417,7 +460,7 @@ mod tests {
 
     #[test]
     fn test_load_texture_data_returns_missing_asset_error() {
-        let manager = AssetManager::new(test_manifest());
+        let mut manager = AssetManager::new(test_manifest());
 
         let error = manager
             .load_texture_data(&AssetId::new("textures/missing"))
@@ -438,7 +481,7 @@ mod tests {
         fs::create_dir_all(&texture_dir).unwrap();
         fs::write(texture_dir.join("player.png"), b"not an image").unwrap();
 
-        let manager = AssetManager::with_root(test_manifest(), asset_root.clone());
+        let mut manager = AssetManager::with_root(test_manifest(), asset_root.clone());
 
         let error = manager
             .load_texture_data(&AssetId::new("textures/player"))
@@ -474,5 +517,100 @@ path = "shaders/colored.wgsl"
 
         assert!(manager.texture("textures/player").is_some());
         assert!(manager.shader("shaders/colored").is_some());
+    }
+
+    #[test]
+    fn test_load_shader_source_uses_cache_until_unloaded() {
+        let asset_root = temp_asset_root("shader-cache");
+        let shader_dir = asset_root.join("shaders");
+        fs::create_dir_all(&shader_dir).unwrap();
+
+        let shader_path = shader_dir.join("colored.wgsl");
+        fs::write(&shader_path, "first").unwrap();
+
+        let mut manager = AssetManager::with_root(test_manifest(), asset_root);
+        let id = AssetId::new("shaders/colored");
+
+        assert_eq!(manager.load_shader_source(&id).unwrap(), "first");
+        assert_eq!(manager.cached_shader_count(), 1);
+
+        fs::write(&shader_path, "second").unwrap();
+
+        assert_eq!(manager.load_shader_source(&id).unwrap(), "first");
+        assert!(manager.unload_shader_source(&id));
+        assert_eq!(manager.cached_shader_count(), 0);
+        assert_eq!(manager.load_shader_source(&id).unwrap(), "second");
+    }
+
+    #[test]
+    fn test_load_texture_data_uses_cache_until_unloaded() {
+        let asset_root = temp_asset_root("texture-cache");
+        let texture_dir = asset_root.join("textures");
+        fs::create_dir_all(&texture_dir).unwrap();
+
+        let texture_path = texture_dir.join("player.png");
+        let first_image = image::RgbaImage::from_raw(1, 1, vec![255, 0, 0, 255]).unwrap();
+        first_image.save(&texture_path).unwrap();
+
+        let mut manager = AssetManager::with_root(test_manifest(), asset_root);
+        let id = AssetId::new("textures/player");
+
+        assert_eq!(
+            manager.load_texture_data(&id).unwrap().rgba,
+            vec![255, 0, 0, 255]
+        );
+        assert_eq!(manager.cached_texture_count(), 1);
+
+        let second_image = image::RgbaImage::from_raw(1, 1, vec![0, 255, 0, 255]).unwrap();
+        second_image.save(&texture_path).unwrap();
+
+        assert_eq!(
+            manager.load_texture_data(&id).unwrap().rgba,
+            vec![255, 0, 0, 255]
+        );
+        assert!(manager.unload_texture_data(&id));
+        assert_eq!(manager.cached_texture_count(), 0);
+        assert_eq!(
+            manager.load_texture_data(&id).unwrap().rgba,
+            vec![0, 255, 0, 255]
+        );
+    }
+
+    #[test]
+    fn test_unload_missing_assets_returns_false() {
+        let mut manager = AssetManager::new(test_manifest());
+
+        assert!(!manager.unload_shader_source(&AssetId::new("shaders/missing")));
+        assert!(!manager.unload_texture_data(&AssetId::new("textures/missing")));
+    }
+
+    #[test]
+    fn test_unload_all_clears_loaded_assets() {
+        let asset_root = temp_asset_root("unload-all");
+        let shader_dir = asset_root.join("shaders");
+        let texture_dir = asset_root.join("textures");
+        fs::create_dir_all(&shader_dir).unwrap();
+        fs::create_dir_all(&texture_dir).unwrap();
+        fs::write(shader_dir.join("colored.wgsl"), "shader").unwrap();
+
+        let image = image::RgbaImage::from_raw(1, 1, vec![255, 255, 255, 255]).unwrap();
+        image.save(texture_dir.join("player.png")).unwrap();
+
+        let mut manager = AssetManager::with_root(test_manifest(), asset_root);
+
+        manager
+            .load_shader_source(&AssetId::new("shaders/colored"))
+            .unwrap();
+        manager
+            .load_texture_data(&AssetId::new("textures/player"))
+            .unwrap();
+
+        assert_eq!(manager.cached_shader_count(), 1);
+        assert_eq!(manager.cached_texture_count(), 1);
+
+        manager.unload_all();
+
+        assert_eq!(manager.cached_shader_count(), 0);
+        assert_eq!(manager.cached_texture_count(), 0);
     }
 }
