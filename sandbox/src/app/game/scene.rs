@@ -348,6 +348,46 @@ mod tests {
     }
 
     #[test]
+    fn test_spawn_enemy_uses_catalog_definition_for_each_enemy_kind() {
+        let catalog = GameCatalog::default();
+
+        for kind in [EnemyKind::Basic, EnemyKind::Fast, EnemyKind::Tank] {
+            let mut scene = scene_with_only_player();
+            let definition = catalog.enemy(kind);
+
+            let enemy = scene.spawn_enemy([3.0, 4.0], kind, &catalog);
+
+            assert_eq!(scene.enemy(enemy).unwrap().kind, kind);
+            assert_eq!(
+                scene.sprite(enemy).unwrap(),
+                &Sprite {
+                    size: definition.sprite_size,
+                    color: definition.sprite_color,
+                }
+            );
+            assert_eq!(
+                scene.circle_collider(enemy).unwrap(),
+                &CircleCollider {
+                    radius: definition.collider_radius,
+                }
+            );
+            assert_eq!(
+                scene.health(enemy).unwrap(),
+                &Health {
+                    current: definition.health,
+                    max: definition.health,
+                }
+            );
+            assert_eq!(
+                scene.death_drop(enemy).unwrap(),
+                &DeathDrop {
+                    reward: definition.death_reward,
+                }
+            );
+        }
+    }
+
+    #[test]
     fn test_scene_object_id_can_be_assigned_and_replaced() {
         let mut scene = scene_with_only_player();
 

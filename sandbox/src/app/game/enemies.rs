@@ -56,7 +56,7 @@ impl EnemyState {
             player_position[1] + spawn_radius * angle.sin(),
         ];
 
-        scene.spawn_enemy(spawn_position, EnemyKind::Basic, catalog);
+        scene.spawn_enemy(spawn_position, enemy_kind_for_spawn(fixed_updates), catalog);
 
         self.spawn_cooldown_secs = 1.5;
     }
@@ -122,6 +122,21 @@ impl EnemyState {
     }
 }
 
+fn enemy_kind_for_spawn(fixed_updates: u64) -> EnemyKind {
+    const FAST_ENEMY_START_TICK: u64 = 60 * 15;
+    const TANK_ENEMY_START_TICK: u64 = 60 * 30;
+
+    if fixed_updates >= TANK_ENEMY_START_TICK && fixed_updates % 4 == 0 {
+        return EnemyKind::Tank;
+    }
+
+    if fixed_updates >= FAST_ENEMY_START_TICK && fixed_updates % 2 == 0 {
+        return EnemyKind::Fast;
+    }
+
+    EnemyKind::Basic
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::test_helpers::scene_with_only_player;
@@ -141,6 +156,51 @@ mod tests {
 
         assert_eq!(scene.enemies.len(), initial_enemy_count + 1);
         assert_eq!(enemies.spawn_cooldown_secs, 1.5);
+    }
+
+    #[test]
+    fn test_spawning_uses_basic_enemy_before_fast_threshold() {
+        let mut scene = scene_with_only_player();
+        let catalog = GameCatalog::default();
+        let mut enemies = EnemyState {
+            spawn_cooldown_secs: 0.0,
+        };
+
+        enemies.fixed_update(&mut scene, &catalog, [0.0, 0.0], 60 * 15 - 1, 0.016);
+
+        let spawned_enemy = *scene.enemies.last().unwrap();
+
+        assert_eq!(scene.enemy(spawned_enemy).unwrap().kind, EnemyKind::Basic);
+    }
+
+    #[test]
+    fn test_spawning_uses_fast_enemy_after_fast_threshold() {
+        let mut scene = scene_with_only_player();
+        let catalog = GameCatalog::default();
+        let mut enemies = EnemyState {
+            spawn_cooldown_secs: 0.0,
+        };
+
+        enemies.fixed_update(&mut scene, &catalog, [0.0, 0.0], 60 * 15, 0.016);
+
+        let spawned_enemy = *scene.enemies.last().unwrap();
+
+        assert_eq!(scene.enemy(spawned_enemy).unwrap().kind, EnemyKind::Fast);
+    }
+
+    #[test]
+    fn test_spawning_uses_tank_enemy_after_tank_threshold() {
+        let mut scene = scene_with_only_player();
+        let catalog = GameCatalog::default();
+        let mut enemies = EnemyState {
+            spawn_cooldown_secs: 0.0,
+        };
+
+        enemies.fixed_update(&mut scene, &catalog, [0.0, 0.0], 60 * 30, 0.016);
+
+        let spawned_enemy = *scene.enemies.last().unwrap();
+
+        assert_eq!(scene.enemy(spawned_enemy).unwrap().kind, EnemyKind::Tank);
     }
 
     #[test]

@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum EnemyKind {
     Basic,
+    Fast,
+    Tank,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -38,6 +40,8 @@ pub struct WeaponDefinition {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GameCatalog {
     pub basic_enemy: EnemyDefinition,
+    pub fast_enemy: EnemyDefinition,
+    pub tank_enemy: EnemyDefinition,
     pub wand: WeaponDefinition,
 }
 
@@ -52,6 +56,24 @@ impl Default for GameCatalog {
                 sprite_size: [1.0, 1.0],
                 sprite_color: [0.9, 0.35, 0.55, 1.0],
                 death_reward: PickupReward::Experience(1),
+            },
+            fast_enemy: EnemyDefinition {
+                health: 12.0,
+                speed: 2.6,
+                contact_damage_per_second: 8.0,
+                collider_radius: 0.28,
+                sprite_size: [0.8, 0.8],
+                sprite_color: [0.95, 0.75, 0.25, 1.0],
+                death_reward: PickupReward::Experience(1),
+            },
+            tank_enemy: EnemyDefinition {
+                health: 60.0,
+                speed: 0.85,
+                contact_damage_per_second: 18.0,
+                collider_radius: 0.55,
+                sprite_size: [1.4, 1.4],
+                sprite_color: [0.55, 0.45, 0.95, 1.0],
+                death_reward: PickupReward::Experience(3),
             },
             wand: WeaponDefinition {
                 cooldown_secs: 0.5,
@@ -70,6 +92,8 @@ impl GameCatalog {
     pub fn enemy(&self, kind: EnemyKind) -> &EnemyDefinition {
         match kind {
             EnemyKind::Basic => &self.basic_enemy,
+            EnemyKind::Fast => &self.fast_enemy,
+            EnemyKind::Tank => &self.tank_enemy,
         }
     }
 
@@ -77,5 +101,31 @@ impl GameCatalog {
         match kind {
             WeaponKind::Wand => &self.wand,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_enemy_returns_basic_enemy_definition() {
+        let catalog = GameCatalog::default();
+
+        assert_eq!(catalog.enemy(EnemyKind::Basic), &catalog.basic_enemy);
+    }
+
+    #[test]
+    fn test_enemy_returns_fast_enemy_definition() {
+        let catalog = GameCatalog::default();
+
+        assert_eq!(catalog.enemy(EnemyKind::Fast), &catalog.fast_enemy);
+    }
+
+    #[test]
+    fn test_enemy_returns_tank_enemy_definition() {
+        let catalog = GameCatalog::default();
+
+        assert_eq!(catalog.enemy(EnemyKind::Tank), &catalog.tank_enemy);
     }
 }

@@ -5,3 +5,13 @@ position = [0.0, 0.0]
 id = "enemy.starting_basic"
 kind = "basic"
 position = [5.0, 5.0]
+
+[[enemies]]
+id = "enemy.starting_fast"
+kind = "fast"
+position = [-6.0, 4.0]
+
+[[enemies]]
+id = "enemy.starting_tank"
+kind = "tank"
+position = [8.0, -5.0]

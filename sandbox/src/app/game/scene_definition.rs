@@ -27,11 +27,23 @@ impl SceneDefinition {
             player: PlayerSceneDefinition {
                 position: [0.0, 0.0],
             },
-            enemies: vec![EnemySpawnDefinition {
-                id: SceneObjectId::new("enemy.starting_basic"),
-                kind: EnemyKind::Basic,
-                position: [5.0, 5.0],
-            }],
+            enemies: vec![
+                EnemySpawnDefinition {
+                    id: SceneObjectId::new("enemy.starting_basic"),
+                    kind: EnemyKind::Basic,
+                    position: [5.0, 5.0],
+                },
+                EnemySpawnDefinition {
+                    id: SceneObjectId::new("enemy.starting_fast"),
+                    kind: EnemyKind::Fast,
+                    position: [-6.0, 4.0],
+                },
+                EnemySpawnDefinition {
+                    id: SceneObjectId::new("enemy.starting_tank"),
+                    kind: EnemyKind::Tank,
+                    position: [8.0, -5.0],
+                },
+            ],
         }
     }
 
@@ -120,6 +132,20 @@ mod tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/demo_scene.toml")
     }
 
+    fn assert_enemy_spawn(
+        scene: &Scene,
+        index: usize,
+        id: &str,
+        kind: EnemyKind,
+        position: [f32; 2],
+    ) {
+        let enemy = scene.enemies[index];
+
+        assert_eq!(scene.enemy(enemy).unwrap().kind, kind);
+        assert_eq!(scene.scene_object_id(enemy), Some(&SceneObjectId::new(id)));
+        assert_eq!(scene.transform(enemy).unwrap().position, position);
+    }
+
     #[test]
     fn test_load_from_file_loads_scene_definition() {
         let path = temp_scene_path("load");
@@ -205,21 +231,27 @@ position = [3.0, 4.0]
         let scene = definition.build_scene(&catalog);
 
         assert_eq!(scene.transform(scene.player).unwrap().position, [0.0, 0.0]);
-        assert_eq!(scene.enemies.len(), 1);
-        assert_eq!(
-            scene.enemy(*scene.enemies.first().unwrap()).unwrap().kind,
-            EnemyKind::Basic
+        assert_eq!(scene.enemies.len(), 3);
+        assert_enemy_spawn(
+            &scene,
+            0,
+            "enemy.starting_basic",
+            EnemyKind::Basic,
+            [5.0, 5.0],
         );
-        assert_eq!(
-            scene.scene_object_id(*scene.enemies.first().unwrap()),
-            Some(&SceneObjectId::new("enemy.starting_basic"))
+        assert_enemy_spawn(
+            &scene,
+            1,
+            "enemy.starting_fast",
+            EnemyKind::Fast,
+            [-6.0, 4.0],
         );
-        assert_eq!(
-            scene
-                .transform(*scene.enemies.first().unwrap())
-                .unwrap()
-                .position,
-            [5.0, 5.0]
+        assert_enemy_spawn(
+            &scene,
+            2,
+            "enemy.starting_tank",
+            EnemyKind::Tank,
+            [8.0, -5.0],
         );
     }
 
