@@ -1,4 +1,5 @@
-use super::{RenderCamera, RenderError, RenderScene, RenderSprite};
+use super::{RenderCamera, RenderError, RenderScene, RenderSprite, TextureResource};
+use crate::TextureData;
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
@@ -8,10 +9,12 @@ const MAX_SPRITE_INSTANCES: usize = 1024;
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct Vertex {
     position: [f32; 2],
+    uv: [f32; 2],
 }
 
 impl Vertex {
-    const ATTRIBUTES: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![0 => Float32x2];
+    const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
+        wgpu::vertex_attr_array![0 => Float32x2, 4 => Float32x2];
 
     fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
@@ -25,15 +28,19 @@ impl Vertex {
 const QUAD_VERTICES: &[Vertex] = &[
     Vertex {
         position: [-1.0, 1.0],
+        uv: [0.0, 0.0],
     },
     Vertex {
         position: [-1.0, -1.0],
+        uv: [0.0, 1.0],
     },
     Vertex {
         position: [1.0, -1.0],
+        uv: [1.0, 1.0],
     },
     Vertex {
         position: [1.0, 1.0],
+        uv: [1.0, 0.0],
     },
 ];
 
@@ -107,6 +114,8 @@ pub struct Renderer<'window> {
     quad_index_count: u32,
     sprite_instance_buffer: wgpu::Buffer,
     sprite_instance_capacity: usize,
+    texture_bind_group_layout: wgpu::BindGroupLayout,
+    default_texture: TextureResource,
 }
 
 impl<'window> Renderer<'window> {
@@ -155,14 +164,37 @@ impl<'window> Renderer<'window> {
 
         surface.configure(&device, &config);
 
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Xenon Texture Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
+
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Xenon Triangle Shader"),
+            label: Some("Xenon Quad Shader"),
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Xenon Triangle Pipeline Layout"),
-            bind_group_layouts: &[],
+            label: Some("Xenon Quad Pipeline Layout"),
+            bind_group_layouts: &[Some(&texture_bind_group_layout)],
             immediate_size: 0,
         });
 
@@ -216,6 +248,16 @@ impl<'window> Renderer<'window> {
             mapped_at_creation: false,
         });
 
+        let default_texture_data = default_texture_data();
+
+        let default_texture = create_texture_resource(
+            &device,
+            &queue,
+            &texture_bind_group_layout,
+            "Xenon Default White Texture",
+            &default_texture_data,
+        );
+
         Ok(Self {
             _instance: instance,
             surface,
@@ -229,7 +271,23 @@ impl<'window> Renderer<'window> {
             quad_index_count,
             sprite_instance_buffer,
             sprite_instance_capacity,
+            texture_bind_group_layout,
+            default_texture,
         })
+    }
+
+    pub fn create_texture_resource(
+        &self,
+        label: &str,
+        texture_data: &TextureData,
+    ) -> TextureResource {
+        create_texture_resource(
+            &self.device,
+            &self.queue,
+            &self.texture_bind_group_layout,
+            label,
+            texture_data,
+        )
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -250,6 +308,24 @@ impl<'window> Renderer<'window> {
         &mut self,
         clear_color: [u8; 4],
         scene: RenderScene<'_>,
+    ) -> Result<(), RenderError> {
+        self.render_internal(clear_color, scene, None)
+    }
+
+    pub fn render_with_texture(
+        &mut self,
+        clear_color: [u8; 4],
+        scene: RenderScene<'_>,
+        texture: &TextureResource,
+    ) -> Result<(), RenderError> {
+        self.render_internal(clear_color, scene, Some(&texture.bind_group))
+    }
+
+    fn render_internal(
+        &mut self,
+        clear_color: [u8; 4],
+        scene: RenderScene<'_>,
+        texture_bind_group: Option<&wgpu::BindGroup>,
     ) -> Result<(), RenderError> {
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
@@ -327,7 +403,11 @@ impl<'window> Renderer<'window> {
             });
 
             if !sprite_instances.is_empty() {
+                let texture_bind_group =
+                    texture_bind_group.unwrap_or(&self.default_texture.bind_group);
+
                 render_pass.set_pipeline(&self.quad_pipeline);
+                render_pass.set_bind_group(0, texture_bind_group, &[]);
                 render_pass.set_vertex_buffer(0, self.quad_vertex_buffer.slice(..));
                 render_pass.set_vertex_buffer(1, self.sprite_instance_buffer.slice(..));
                 render_pass
@@ -347,11 +427,176 @@ impl<'window> Renderer<'window> {
     }
 }
 
+fn default_texture_data() -> TextureData {
+    TextureData {
+        width: 1,
+        height: 1,
+        rgba: vec![255, 255, 255, 255],
+    }
+}
+
+fn texture_extent(texture_data: &TextureData) -> wgpu::Extent3d {
+    wgpu::Extent3d {
+        width: texture_data.width,
+        height: texture_data.height,
+        depth_or_array_layers: 1,
+    }
+}
+
+fn texture_copy_layout(texture_data: &TextureData) -> wgpu::TexelCopyBufferLayout {
+    wgpu::TexelCopyBufferLayout {
+        offset: 0,
+        bytes_per_row: Some(4 * texture_data.width),
+        rows_per_image: Some(texture_data.height),
+    }
+}
+
+fn create_texture_resource(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    bind_group_layout: &wgpu::BindGroupLayout,
+    label: &str,
+    texture_data: &TextureData,
+) -> TextureResource {
+    let size = texture_extent(texture_data);
+
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some(label),
+        size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        &texture_data.rgba,
+        texture_copy_layout(texture_data),
+        size,
+    );
+
+    let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("Xenon Texture Sampler"),
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        address_mode_w: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Nearest,
+        min_filter: wgpu::FilterMode::Nearest,
+        mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+        ..Default::default()
+    });
+
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("Xenon Texture Bind Group"),
+        layout: bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(&sampler),
+            },
+        ],
+    });
+
+    TextureResource {
+        _texture: texture,
+        _view: view,
+        _sampler: sampler,
+        bind_group,
+    }
+}
+
 fn color_from_rgba8([r, g, b, a]: [u8; 4]) -> wgpu::Color {
     wgpu::Color {
         r: r as f64 / 255.0,
         g: g as f64 / 255.0,
         b: b as f64 / 255.0,
         a: a as f64 / 255.0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vertex_layout_includes_position_and_uv_attributes() {
+        let layout = Vertex::layout();
+
+        assert_eq!(layout.array_stride, std::mem::size_of::<Vertex>() as u64);
+        assert_eq!(layout.step_mode, wgpu::VertexStepMode::Vertex);
+        assert_eq!(layout.attributes.len(), 2);
+        assert_eq!(layout.attributes[0].shader_location, 0);
+        assert_eq!(layout.attributes[0].format, wgpu::VertexFormat::Float32x2);
+        assert_eq!(layout.attributes[1].shader_location, 4);
+        assert_eq!(layout.attributes[1].format, wgpu::VertexFormat::Float32x2);
+    }
+
+    #[test]
+    fn test_quad_vertices_define_full_uv_range() {
+        let uvs: Vec<_> = QUAD_VERTICES.iter().map(|vertex| vertex.uv).collect();
+
+        assert_eq!(uvs, vec![[0.0, 0.0], [0.0, 1.0], [1.0, 1.0], [1.0, 0.0]]);
+    }
+
+    #[test]
+    fn test_default_texture_data_is_opaque_white_pixel() {
+        let texture = default_texture_data();
+
+        assert_eq!(texture.width, 1);
+        assert_eq!(texture.height, 1);
+        assert_eq!(texture.rgba, vec![255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn test_texture_extent_uses_texture_data_dimensions() {
+        let texture = TextureData {
+            width: 8,
+            height: 4,
+            rgba: vec![255; 8 * 4 * 4],
+        };
+
+        let extent = texture_extent(&texture);
+
+        assert_eq!(extent.width, 8);
+        assert_eq!(extent.height, 4);
+        assert_eq!(extent.depth_or_array_layers, 1);
+    }
+
+    #[test]
+    fn test_texture_copy_layout_uses_rgba_stride() {
+        let texture = TextureData {
+            width: 8,
+            height: 4,
+            rgba: vec![255; 8 * 4 * 4],
+        };
+
+        let layout = texture_copy_layout(&texture);
+
+        assert_eq!(layout.offset, 0);
+        assert_eq!(layout.bytes_per_row, Some(32));
+        assert_eq!(layout.rows_per_image, Some(4));
+    }
+
+    #[test]
+    fn test_builtin_shader_declares_texture_bindings() {
+        let shader = include_str!("shaders/colored.wgsl");
+
+        assert!(shader.contains("@group(0) @binding(0)"));
+        assert!(shader.contains("@group(0) @binding(1)"));
+        assert!(shader.contains("textureSample(sprite_texture, sprite_sampler, input.uv)"));
     }
 }

@@ -7,7 +7,7 @@ pub use assets::{
     AssetError, AssetId, AssetManager, AssetManifest, Handle, ShaderAsset, ShaderAssetEntry,
     TextureAsset, TextureAssetEntry, TextureData,
 };
-pub use render::{RenderCamera, RenderError, RenderScene, RenderSprite, Renderer};
+pub use render::{RenderCamera, RenderError, RenderScene, RenderSprite, Renderer, TextureResource};
 pub use runtime::{
     EngineConfig, FixedStep, FixedSteps, FixedTimestep, FpsCounter, FrameClock, FrameTiming,
     LifecycleEvent, RuntimeError,
@@ -29,5 +29,12 @@ mod tests {
         assert_eq!(texture.width, 1);
         assert_eq!(texture.height, 1);
         assert_eq!(texture.rgba, vec![255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn test_texture_resource_is_exported_from_crate_root() {
+        fn accepts_texture_resource(_resource: Option<TextureResource>) {}
+
+        accepts_texture_resource(None);
     }
 }
