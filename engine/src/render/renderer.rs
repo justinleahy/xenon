@@ -88,7 +88,7 @@ impl SpriteInstance {
                 -screen_pixels[1] / (height * 0.5),
             ],
             scale: [size_pixels[0] / width, size_pixels[1] / height],
-            color: sprite.color,
+            color: sprite.material.base_color,
         }
     }
 

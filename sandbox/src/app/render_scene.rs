@@ -1,5 +1,5 @@
 use super::state::SandboxState;
-use xenon_engine::{RenderCamera, RenderScene, RenderSprite};
+use xenon_engine::{RenderCamera, RenderScene, RenderSprite, render::Material};
 
 const PIXELS_PER_WORLD_UNIT: f32 = 32.0;
 
@@ -15,7 +15,7 @@ pub fn build_render_sprites(state: &SandboxState) -> Vec<RenderSprite> {
         sprites.push(RenderSprite {
             position: transform.position,
             size: sprite.size,
-            color: sprite.color,
+            material: Material::from_color(sprite.color),
         });
     }
 
@@ -56,7 +56,7 @@ fn append_grid_sprites(sprites: &mut Vec<RenderSprite>, camera_position: [f32; 2
         sprites.push(RenderSprite {
             position: [x as f32, camera_position[1]],
             size: [line_thickness, (radius * 2) as f32],
-            color: if x == 0 { axis_color } else { grid_color },
+            material: Material::from_color(if x == 0 { axis_color } else { grid_color }),
         })
     }
 
@@ -64,7 +64,7 @@ fn append_grid_sprites(sprites: &mut Vec<RenderSprite>, camera_position: [f32; 2
         sprites.push(RenderSprite {
             position: [camera_position[0], y as f32],
             size: [(radius * 2) as f32, line_thickness],
-            color: if y == 0 { axis_color } else { grid_color },
+            material: Material::from_color(if y == 0 { axis_color } else { grid_color }),
         })
     }
 }
@@ -87,7 +87,7 @@ fn append_health_bar_sprites(sprites: &mut Vec<RenderSprite>, state: &SandboxSta
     sprites.push(RenderSprite {
         position: bar_center,
         size: [bar_width, bar_height],
-        color: [0.18, 0.08, 0.08, 1.0],
+        material: Material::from_color([0.18, 0.08, 0.08, 1.0]),
     });
 
     let fill_width = bar_width * health_fraction;
@@ -107,7 +107,7 @@ fn append_health_bar_sprites(sprites: &mut Vec<RenderSprite>, state: &SandboxSta
     sprites.push(RenderSprite {
         position: fill_center,
         size: [fill_width, bar_height],
-        color: fill_color,
+        material: Material::from_color(fill_color),
     });
 }
 
@@ -159,7 +159,7 @@ mod tests {
                 RenderSprite {
                     position: [12.5, -3.25],
                     size: [2.0, 3.0],
-                    color: [0.1, 0.2, 0.3, 1.0],
+                    material: Material::from_color([0.1, 0.2, 0.3, 1.0]),
                 },
             ),
             1
@@ -183,7 +183,7 @@ mod tests {
         assert!(!sprites.iter().any(|sprite| {
             sprite.position == [12.5, -3.25]
                 && sprite.size == [2.0, 3.0]
-                && sprite.color == [0.1, 0.2, 0.3, 1.0]
+                && sprite.material.base_color == [0.1, 0.2, 0.3, 1.0]
         }));
     }
 
@@ -204,7 +204,7 @@ mod tests {
                 RenderSprite {
                     position: [2.0, 3.0],
                     size: [0.2, 0.12],
-                    color: [0.95, 0.9, 0.35, 1.0],
+                    material: Material::from_color([0.95, 0.9, 0.35, 1.0]),
                 },
             ),
             1
@@ -220,12 +220,12 @@ mod tests {
         assert!(sprites.iter().any(|sprite| {
             sprite.position == [0.0, 0.0]
                 && sprite.size == [2.0 / 32.0, 40.0]
-                && sprite.color == [0.18, 0.24, 0.28, 1.0]
+                && sprite.material.base_color == [0.18, 0.24, 0.28, 1.0]
         }));
         assert!(sprites.iter().any(|sprite| {
             sprite.position == [-17.0, -10.0]
                 && sprite.size == [8.0, 0.35]
-                && sprite.color == [0.18, 0.08, 0.08, 1.0]
+                && sprite.material.base_color == [0.18, 0.08, 0.08, 1.0]
         }));
     }
 }

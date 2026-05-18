@@ -13,7 +13,9 @@ pub use assets::{
     TextureAsset, TextureAssetEntry, TextureData,
 };
 #[cfg(feature = "render")]
-pub use render::{RenderCamera, RenderError, RenderScene, RenderSprite, Renderer, TextureResource};
+pub use render::{
+    Material, RenderCamera, RenderError, RenderScene, RenderSprite, Renderer, TextureResource,
+};
 #[cfg(feature = "runtime")]
 pub use runtime::{
     EngineConfig, FixedStep, FixedSteps, FixedTimestep, FpsCounter, FrameClock, FrameTiming,

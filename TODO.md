@@ -64,7 +64,7 @@ This checklist mirrors `GAME_ENGINE_DEVELOPMENT_PHASES.md`. Completed items are 
 - [x] Mesh and buffer management.
 - [x] Texture loading path.
 - [x] Camera model.
-- [ ] Material representation.
+- [x] Material representation.
 - [x] Basic 2D draw path.
 - [x] Debug grid or primitive rendering.
 
