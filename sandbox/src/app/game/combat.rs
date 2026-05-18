@@ -5,22 +5,34 @@ pub struct WeaponState {
     pub cooldown_remaining_secs: f32,
 }
 
+impl WeaponState {
+    pub fn new(kind: WeaponKind) -> Self {
+        Self {
+            kind,
+            cooldown_remaining_secs: 0.0,
+        }
+    }
+}
+
 pub struct CombatState {
-    pub weapon_state: WeaponState,
+    pub weapons: Vec<WeaponState>,
 }
 
 impl Default for CombatState {
     fn default() -> Self {
         Self {
-            weapon_state: WeaponState {
-                kind: WeaponKind::Pistol,
-                cooldown_remaining_secs: 0.0,
-            },
+            weapons: vec![WeaponState::new(WeaponKind::Pistol)],
         }
     }
 }
 
 impl CombatState {
+    pub fn with_weapons(weapon_kinds: &[WeaponKind]) -> Self {
+        Self {
+            weapons: weapon_kinds.iter().copied().map(WeaponState::new).collect(),
+        }
+    }
+
     pub fn fixed_update(
         &mut self,
         scene: &mut Scene,
@@ -28,53 +40,12 @@ impl CombatState {
         player_position: [f32; 2],
         delta_secs: f32,
     ) {
-        self.update_weapon(scene, catalog, player_position, delta_secs);
+        for weapon in &mut self.weapons {
+            update_weapon(scene, catalog, player_position, delta_secs, weapon);
+        }
+
         self.update_projectiles(scene, delta_secs);
         self.resolve_projectile_hits(scene);
-    }
-
-    fn update_weapon(
-        &mut self,
-        scene: &mut Scene,
-        catalog: &GameCatalog,
-        player_position: [f32; 2],
-        delta_secs: f32,
-    ) {
-        let weapon = catalog.weapon(self.weapon_state.kind);
-        self.weapon_state.cooldown_remaining_secs =
-            (self.weapon_state.cooldown_remaining_secs - delta_secs).max(0.0);
-
-        if self.weapon_state.cooldown_remaining_secs > 0.0 {
-            return;
-        }
-
-        let Some(target_position) = nearest_enemy_position(&scene, player_position) else {
-            return;
-        };
-
-        let to_target = [
-            target_position[0] - player_position[0],
-            target_position[1] - player_position[1],
-        ];
-
-        let distance = (to_target[0] * to_target[0] + to_target[1] * to_target[1]).sqrt();
-
-        if distance <= 0.001 {
-            return;
-        }
-
-        let direction = [to_target[0] / distance, to_target[1] / distance];
-
-        scene.spawn_projectile(
-            player_position,
-            [
-                direction[0] * weapon.projectile_speed,
-                direction[1] * weapon.projectile_speed,
-            ],
-            weapon,
-        );
-
-        self.weapon_state.cooldown_remaining_secs = weapon.cooldown_secs;
     }
 
     fn update_projectiles(&mut self, scene: &mut Scene, delta_secs: f32) {
@@ -179,6 +150,50 @@ impl CombatState {
             scene.despawn_entity(projectile);
         }
     }
+}
+
+fn update_weapon(
+    scene: &mut Scene,
+    catalog: &GameCatalog,
+    player_position: [f32; 2],
+    delta_secs: f32,
+    weapon_state: &mut WeaponState,
+) {
+    let weapon = catalog.weapon(weapon_state.kind);
+    weapon_state.cooldown_remaining_secs =
+        (weapon_state.cooldown_remaining_secs - delta_secs).max(0.0);
+
+    if weapon_state.cooldown_remaining_secs > 0.0 {
+        return;
+    }
+
+    let Some(target_position) = nearest_enemy_position(scene, player_position) else {
+        return;
+    };
+
+    let to_target = [
+        target_position[0] - player_position[0],
+        target_position[1] - player_position[1],
+    ];
+
+    let distance = (to_target[0] * to_target[0] + to_target[1] * to_target[1]).sqrt();
+
+    if distance <= 0.001 {
+        return;
+    }
+
+    let direction = [to_target[0] / distance, to_target[1] / distance];
+
+    scene.spawn_projectile(
+        player_position,
+        [
+            direction[0] * weapon.projectile_speed,
+            direction[1] * weapon.projectile_speed,
+        ],
+        weapon,
+    );
+
+    weapon_state.cooldown_remaining_secs = weapon.cooldown_secs;
 }
 
 fn nearest_enemy_position(scene: &Scene, player_position: [f32; 2]) -> Option<[f32; 2]> {
@@ -336,7 +351,7 @@ mod tests {
         combat.fixed_update(&mut scene, &catalog, [0.0, 0.0], 0.0);
 
         assert_eq!(scene.projectiles.len(), 1);
-        assert_eq!(combat.weapon_state.cooldown_remaining_secs, 0.5);
+        assert_eq!(combat.weapons[0].cooldown_remaining_secs, 0.5);
     }
 
     #[test]
@@ -346,10 +361,7 @@ mod tests {
         scene.spawn_enemy([4.0, 0.0], EnemyKind::Basic, &catalog);
 
         let mut combat = CombatState {
-            weapon_state: WeaponState {
-                kind: WeaponKind::Shotgun,
-                cooldown_remaining_secs: 0.0,
-            },
+            weapons: vec![WeaponState::new(WeaponKind::Shotgun)],
         };
 
         combat.fixed_update(&mut scene, &catalog, [0.0, 0.0], 0.0);
@@ -358,7 +370,7 @@ mod tests {
         let shotgun = catalog.weapon(WeaponKind::Shotgun);
 
         assert_eq!(
-            combat.weapon_state.cooldown_remaining_secs,
+            combat.weapons[0].cooldown_remaining_secs,
             shotgun.cooldown_secs
         );
         assert_eq!(
@@ -373,5 +385,52 @@ mod tests {
             scene.circle_collider(projectile).unwrap().radius,
             shotgun.projectile_collider_radius
         );
+    }
+
+    #[test]
+    fn test_fixed_update_fires_all_ready_weapons() {
+        let mut scene = scene_with_only_player();
+        let catalog = GameCatalog::default();
+        scene.spawn_enemy([4.0, 0.0], EnemyKind::Basic, &catalog);
+
+        let mut combat = CombatState::with_weapons(&[WeaponKind::Pistol, WeaponKind::Smg]);
+
+        combat.fixed_update(&mut scene, &catalog, [0.0, 0.0], 0.0);
+
+        assert_eq!(scene.projectiles.len(), 2);
+        assert_eq!(
+            combat.weapons[0].cooldown_remaining_secs,
+            catalog.weapon(WeaponKind::Pistol).cooldown_secs
+        );
+        assert_eq!(
+            combat.weapons[1].cooldown_remaining_secs,
+            catalog.weapon(WeaponKind::Smg).cooldown_secs
+        );
+    }
+
+    #[test]
+    fn test_weapon_cooldowns_are_independent() {
+        let mut scene = scene_with_only_player();
+        let catalog = GameCatalog::default();
+        scene.spawn_enemy([12.0, 0.0], EnemyKind::Basic, &catalog);
+
+        let mut combat = CombatState {
+            weapons: vec![
+                WeaponState {
+                    kind: WeaponKind::Pistol,
+                    cooldown_remaining_secs: 0.0,
+                },
+                WeaponState {
+                    kind: WeaponKind::Smg,
+                    cooldown_remaining_secs: 0.1,
+                },
+            ],
+        };
+
+        combat.fixed_update(&mut scene, &catalog, [0.0, 0.0], 0.05);
+
+        assert_eq!(scene.projectiles.len(), 1);
+        assert_eq!(combat.weapons[0].cooldown_remaining_secs, 0.5);
+        assert_eq!(combat.weapons[1].cooldown_remaining_secs, 0.05);
     }
 }

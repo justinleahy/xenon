@@ -27,8 +27,8 @@ impl SandboxState {
             simulation_time_secs: 0.0,
             fixed_updates: 0,
             scene: scene_definition.build_scene(&game_catalog),
+            systems: GameSystems::with_weapons(&scene_definition.player.weapons),
             initial_scene_definition: scene_definition,
-            systems: GameSystems::default(),
             game_catalog,
         }
     }
@@ -104,7 +104,9 @@ impl SandboxState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::game::{EnemyKind, EnemySpawnDefinition, PlayerSceneDefinition, SceneObjectId};
+    use crate::app::game::{
+        EnemyKind, EnemySpawnDefinition, PlayerSceneDefinition, SceneObjectId, WeaponKind,
+    };
 
     #[test]
     fn test_reset_restores_initial_scene_definition() {
@@ -112,6 +114,7 @@ mod tests {
         let scene_definition = SceneDefinition {
             player: PlayerSceneDefinition {
                 position: [3.0, 4.0],
+                weapons: vec![WeaponKind::Pistol, WeaponKind::Shotgun],
             },
             enemies: vec![EnemySpawnDefinition {
                 id: SceneObjectId::new("enemy.reset_basic"),
@@ -146,5 +149,8 @@ mod tests {
                 .scene_object_id(*state.scene.enemies.first().unwrap()),
             Some(&SceneObjectId::new("enemy.reset_basic"))
         );
+        assert_eq!(state.systems.combat.weapons.len(), 2);
+        assert_eq!(state.systems.combat.weapons[0].kind, WeaponKind::Pistol);
+        assert_eq!(state.systems.combat.weapons[1].kind, WeaponKind::Shotgun);
     }
 }

@@ -1,4 +1,6 @@
-use super::{CombatState, EnemyState, GameCatalog, PlayerController, PlayerProgression, Scene};
+use super::{
+    CombatState, EnemyState, GameCatalog, PlayerController, PlayerProgression, Scene, WeaponKind,
+};
 use crate::app::input::InputState;
 
 #[derive(Default)]
@@ -10,6 +12,13 @@ pub struct GameSystems {
 }
 
 impl GameSystems {
+    pub fn with_weapons(weapon_kinds: &[WeaponKind]) -> Self {
+        Self {
+            combat: CombatState::with_weapons(weapon_kinds),
+            ..Self::default()
+        }
+    }
+
     pub fn fixed_update(
         &mut self,
         scene: &mut Scene,
@@ -105,5 +114,14 @@ mod tests {
         assert_eq!(scene.transform(scene.player).unwrap().position, [2.5, 0.0]);
         assert_eq!(systems.player_progression.experience, 3);
         assert!(scene.pickup(pickup).is_none());
+    }
+
+    #[test]
+    fn test_with_weapons_initializes_combat_weapon_set() {
+        let systems = GameSystems::with_weapons(&[WeaponKind::Pistol, WeaponKind::Smg]);
+
+        assert_eq!(systems.combat.weapons.len(), 2);
+        assert_eq!(systems.combat.weapons[0].kind, WeaponKind::Pistol);
+        assert_eq!(systems.combat.weapons[1].kind, WeaponKind::Smg);
     }
 }

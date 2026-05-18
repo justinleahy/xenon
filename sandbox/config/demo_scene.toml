@@ -1,5 +1,6 @@
 [player]
 position = [0.0, 0.0]
+weapons = ["pistol", "smg"]
 
 [[enemies]]
 id = "enemy.starting_basic"

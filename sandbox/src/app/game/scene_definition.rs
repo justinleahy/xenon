@@ -1,4 +1,4 @@
-use super::{EnemyKind, GameCatalog, Scene, SceneObjectId};
+use super::{EnemyKind, GameCatalog, Scene, SceneObjectId, WeaponKind};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -9,9 +9,11 @@ pub struct SceneDefinition {
     pub enemies: Vec<EnemySpawnDefinition>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerSceneDefinition {
     pub position: [f32; 2],
+    #[serde(default = "default_player_weapons")]
+    pub weapons: Vec<WeaponKind>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -26,6 +28,7 @@ impl SceneDefinition {
         Self {
             player: PlayerSceneDefinition {
                 position: [0.0, 0.0],
+                weapons: vec![WeaponKind::Pistol, WeaponKind::Smg],
             },
             enemies: vec![
                 EnemySpawnDefinition {
@@ -104,10 +107,15 @@ impl SceneDefinition {
         Self {
             player: PlayerSceneDefinition {
                 position: player_position,
+                weapons: default_player_weapons(),
             },
             enemies,
         }
     }
+}
+
+fn default_player_weapons() -> Vec<WeaponKind> {
+    vec![WeaponKind::Pistol]
 }
 
 #[cfg(test)]
@@ -146,6 +154,10 @@ mod tests {
         assert_eq!(scene.transform(enemy).unwrap().position, position);
     }
 
+    fn default_weapons() -> Vec<WeaponKind> {
+        vec![WeaponKind::Pistol]
+    }
+
     #[test]
     fn test_load_from_file_loads_scene_definition() {
         let path = temp_scene_path("load");
@@ -166,6 +178,7 @@ position = [3.0, 4.0]
         let definition = SceneDefinition::load_from_file(&path).unwrap();
 
         assert_eq!(definition.player.position, [1.0, 2.0]);
+        assert_eq!(definition.player.weapons, default_weapons());
         assert_eq!(
             definition.enemies,
             vec![EnemySpawnDefinition {
@@ -194,6 +207,7 @@ position = [3.0, 4.0]
         let definition = SceneDefinition {
             player: PlayerSceneDefinition {
                 position: [2.0, -1.0],
+                weapons: vec![WeaponKind::Pistol, WeaponKind::Smg],
             },
             enemies: vec![EnemySpawnDefinition {
                 id: SceneObjectId::new("enemy.test_basic"),
@@ -230,6 +244,10 @@ position = [3.0, 4.0]
 
         let scene = definition.build_scene(&catalog);
 
+        assert_eq!(
+            definition.player.weapons,
+            vec![WeaponKind::Pistol, WeaponKind::Smg]
+        );
         assert_eq!(scene.transform(scene.player).unwrap().position, [0.0, 0.0]);
         assert_eq!(scene.enemies.len(), 3);
         assert_enemy_spawn(
@@ -271,6 +289,7 @@ position = [3.0, 4.0]
             SceneDefinition {
                 player: PlayerSceneDefinition {
                     position: [2.0, -1.0],
+                    weapons: default_weapons(),
                 },
                 enemies: vec![EnemySpawnDefinition {
                     id: SceneObjectId::new("enemy.saved_basic"),
