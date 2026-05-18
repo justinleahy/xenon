@@ -13,7 +13,7 @@ impl Default for CombatState {
     fn default() -> Self {
         Self {
             weapon_state: WeaponState {
-                kind: WeaponKind::Wand,
+                kind: WeaponKind::Pistol,
                 cooldown_remaining_secs: 0.0,
             },
         }
@@ -233,7 +233,7 @@ mod tests {
     fn test_projectile_hit_despawns_enemy_and_projectile() {
         let mut scene = scene_with_only_player();
         let catalog = GameCatalog::default();
-        let weapon = catalog.weapon(WeaponKind::Wand);
+        let weapon = catalog.weapon(WeaponKind::Pistol);
 
         let enemy = scene.spawn_enemy([1.0, 0.0], EnemyKind::Basic, &catalog);
         let projectile_entity = scene.spawn_projectile([2.0, 0.0], [1.0, 0.0], weapon);
@@ -268,7 +268,7 @@ mod tests {
     fn test_projectile_miss_keeps_enemy_and_projectile() {
         let mut scene = scene_with_only_player();
         let catalog = GameCatalog::default();
-        let weapon = catalog.weapon(WeaponKind::Wand);
+        let weapon = catalog.weapon(WeaponKind::Pistol);
 
         let enemy = scene.spawn_enemy([1.0, 0.51], EnemyKind::Basic, &catalog);
         let projectile_entity = scene.spawn_projectile([2.0, 0.0], [1.0, 0.0], weapon);
@@ -297,7 +297,7 @@ mod tests {
     fn test_projectile_hit_damages_enemy_without_despawning_nonlethal_enemy() {
         let mut scene = scene_with_only_player();
         let catalog = GameCatalog::default();
-        let weapon = catalog.weapon(WeaponKind::Wand);
+        let weapon = catalog.weapon(WeaponKind::Pistol);
 
         let enemy = scene.spawn_enemy([1.0, 0.0], EnemyKind::Basic, &catalog);
         let projectile_entity = scene.spawn_projectile([2.0, 0.0], [1.0, 0.0], weapon);
@@ -337,5 +337,41 @@ mod tests {
 
         assert_eq!(scene.projectiles.len(), 1);
         assert_eq!(combat.weapon_state.cooldown_remaining_secs, 0.5);
+    }
+
+    #[test]
+    fn test_fixed_update_uses_selected_gun_definition() {
+        let mut scene = scene_with_only_player();
+        let catalog = GameCatalog::default();
+        scene.spawn_enemy([4.0, 0.0], EnemyKind::Basic, &catalog);
+
+        let mut combat = CombatState {
+            weapon_state: WeaponState {
+                kind: WeaponKind::Shotgun,
+                cooldown_remaining_secs: 0.0,
+            },
+        };
+
+        combat.fixed_update(&mut scene, &catalog, [0.0, 0.0], 0.0);
+
+        let projectile = scene.projectiles.first().unwrap().0;
+        let shotgun = catalog.weapon(WeaponKind::Shotgun);
+
+        assert_eq!(
+            combat.weapon_state.cooldown_remaining_secs,
+            shotgun.cooldown_secs
+        );
+        assert_eq!(
+            scene.damage(projectile).unwrap().amount,
+            shotgun.projectile_damage
+        );
+        assert_eq!(
+            scene.sprite(projectile).unwrap().size,
+            shotgun.projectile_size
+        );
+        assert_eq!(
+            scene.circle_collider(projectile).unwrap().radius,
+            shotgun.projectile_collider_radius
+        );
     }
 }

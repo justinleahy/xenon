@@ -405,16 +405,16 @@ mod tests {
     fn test_spawn_projectile_creates_transform_sprite_and_projectile_component() {
         let mut scene = scene_with_only_player();
         let catalog = GameCatalog::default();
-        let weapon = catalog.weapon(WeaponKind::Wand);
+        let weapon = catalog.weapon(WeaponKind::Pistol);
 
-        let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0], weapon);
+        let projectile = scene.spawn_projectile([1.0, 2.0], [10.0, 0.0], weapon);
 
         assert_eq!(scene.transform(projectile).unwrap().position, [1.0, 2.0]);
         assert_eq!(
             scene.sprite(projectile).unwrap(),
             &Sprite {
-                size: [0.25, 0.25],
-                color: [0.35, 0.75, 1.0, 1.0],
+                size: [0.2, 0.12],
+                color: [0.95, 0.9, 0.35, 1.0],
             }
         );
         assert_eq!(
@@ -427,15 +427,62 @@ mod tests {
                 .unwrap(),
             &Projectile {
                 previous_position: [1.0, 2.0],
-                velocity: [8.0, 0.0],
-                lifetime_secs: 2.0,
+                velocity: [10.0, 0.0],
+                lifetime_secs: 1.5,
             }
         );
         assert_eq!(
             scene.circle_collider(projectile).unwrap(),
-            &CircleCollider { radius: 0.15 }
+            &CircleCollider { radius: 0.12 }
         );
         assert_eq!(scene.damage(projectile).unwrap(), &Damage { amount: 10.0 });
+    }
+
+    #[test]
+    fn test_spawn_projectile_uses_catalog_definition_for_each_weapon_kind() {
+        let catalog = GameCatalog::default();
+
+        for kind in [WeaponKind::Pistol, WeaponKind::Smg, WeaponKind::Shotgun] {
+            let mut scene = scene_with_only_player();
+            let weapon = catalog.weapon(kind);
+
+            let projectile =
+                scene.spawn_projectile([1.0, 2.0], [weapon.projectile_speed, 0.0], weapon);
+
+            assert_eq!(
+                scene.sprite(projectile).unwrap(),
+                &Sprite {
+                    size: weapon.projectile_size,
+                    color: weapon.projectile_color,
+                }
+            );
+            assert_eq!(
+                scene
+                    .projectiles
+                    .iter()
+                    .find_map(|(entity, projectile_component)| {
+                        (*entity == projectile).then_some(projectile_component)
+                    })
+                    .unwrap(),
+                &Projectile {
+                    previous_position: [1.0, 2.0],
+                    velocity: [weapon.projectile_speed, 0.0],
+                    lifetime_secs: weapon.projectile_lifetime_secs,
+                }
+            );
+            assert_eq!(
+                scene.circle_collider(projectile).unwrap(),
+                &CircleCollider {
+                    radius: weapon.projectile_collider_radius,
+                }
+            );
+            assert_eq!(
+                scene.damage(projectile).unwrap(),
+                &Damage {
+                    amount: weapon.projectile_damage,
+                }
+            );
+        }
     }
 
     #[test]
@@ -468,7 +515,7 @@ mod tests {
     fn test_despawn_entity_removes_components_and_tags() {
         let mut scene = scene_with_only_player();
         let catalog = GameCatalog::default();
-        let weapon = catalog.weapon(WeaponKind::Wand);
+        let weapon = catalog.weapon(WeaponKind::Pistol);
 
         let enemy = scene.spawn_enemy([3.0, 4.0], EnemyKind::Basic, &catalog);
         let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0], weapon);
@@ -509,7 +556,7 @@ mod tests {
     fn test_mut_helpers_update_sprite_circle_collider_and_damage_components() {
         let mut scene = scene_with_only_player();
         let catalog = GameCatalog::default();
-        let weapon = catalog.weapon(WeaponKind::Wand);
+        let weapon = catalog.weapon(WeaponKind::Pistol);
         let projectile = scene.spawn_projectile([1.0, 2.0], [8.0, 0.0], weapon);
 
         scene.sprite_mut(scene.player).unwrap().size = [2.0, 2.0];

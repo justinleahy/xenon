@@ -192,7 +192,7 @@ mod tests {
         let mut state = state_with_empty_scene();
         let weapon = state
             .game_catalog
-            .weapon(super::super::game::WeaponKind::Wand);
+            .weapon(super::super::game::WeaponKind::Pistol);
 
         state.scene.spawn_projectile([2.0, 3.0], [8.0, 0.0], weapon);
 
@@ -203,8 +203,8 @@ mod tests {
                 &sprites,
                 RenderSprite {
                     position: [2.0, 3.0],
-                    size: [0.25, 0.25],
-                    color: [0.35, 0.75, 1.0, 1.0],
+                    size: [0.2, 0.12],
+                    color: [0.95, 0.9, 0.35, 1.0],
                 },
             ),
             1

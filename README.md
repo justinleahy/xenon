@@ -24,6 +24,7 @@ Implemented so far:
 - Stable scene-object IDs for serialized scene enemies.
 - Catalog-driven enemy archetypes for basic, fast, and tank enemies.
 - Starting demo scene uses basic, fast, and tank enemy archetypes.
+- Gun-style weapon archetypes for pistol, SMG, and shotgun behavior.
 - Circle-collider based projectile hits and enemy contact damage.
 - Enemy health, projectile damage, death drops, pickups, and player experience collection.
 - Sandbox gameplay loop with player movement, enemy spawning/chasing, automatic projectile firing, pickup collection, and reset.

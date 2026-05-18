@@ -23,7 +23,9 @@ pub struct EnemyDefinition {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WeaponKind {
-    Wand,
+    Pistol,
+    Smg,
+    Shotgun,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -42,7 +44,9 @@ pub struct GameCatalog {
     pub basic_enemy: EnemyDefinition,
     pub fast_enemy: EnemyDefinition,
     pub tank_enemy: EnemyDefinition,
-    pub wand: WeaponDefinition,
+    pub pistol: WeaponDefinition,
+    pub smg: WeaponDefinition,
+    pub shotgun: WeaponDefinition,
 }
 
 impl Default for GameCatalog {
@@ -75,14 +79,32 @@ impl Default for GameCatalog {
                 sprite_color: [0.55, 0.45, 0.95, 1.0],
                 death_reward: PickupReward::Experience(3),
             },
-            wand: WeaponDefinition {
+            pistol: WeaponDefinition {
                 cooldown_secs: 0.5,
-                projectile_speed: 8.0,
+                projectile_speed: 10.0,
                 projectile_damage: 10.0,
-                projectile_size: [0.25, 0.25],
-                projectile_color: [0.35, 0.75, 1.0, 1.0],
-                projectile_collider_radius: 0.15,
-                projectile_lifetime_secs: 2.0,
+                projectile_size: [0.2, 0.12],
+                projectile_color: [0.95, 0.9, 0.35, 1.0],
+                projectile_collider_radius: 0.12,
+                projectile_lifetime_secs: 1.5,
+            },
+            smg: WeaponDefinition {
+                cooldown_secs: 0.16,
+                projectile_speed: 11.5,
+                projectile_damage: 5.0,
+                projectile_size: [0.16, 0.1],
+                projectile_color: [0.45, 0.8, 1.0, 1.0],
+                projectile_collider_radius: 0.1,
+                projectile_lifetime_secs: 1.25,
+            },
+            shotgun: WeaponDefinition {
+                cooldown_secs: 0.9,
+                projectile_speed: 8.0,
+                projectile_damage: 28.0,
+                projectile_size: [0.38, 0.22],
+                projectile_color: [1.0, 0.55, 0.25, 1.0],
+                projectile_collider_radius: 0.24,
+                projectile_lifetime_secs: 0.9,
             },
         }
     }
@@ -99,7 +121,9 @@ impl GameCatalog {
 
     pub fn weapon(&self, kind: WeaponKind) -> &WeaponDefinition {
         match kind {
-            WeaponKind::Wand => &self.wand,
+            WeaponKind::Pistol => &self.pistol,
+            WeaponKind::Smg => &self.smg,
+            WeaponKind::Shotgun => &self.shotgun,
         }
     }
 }
@@ -127,5 +151,26 @@ mod tests {
         let catalog = GameCatalog::default();
 
         assert_eq!(catalog.enemy(EnemyKind::Tank), &catalog.tank_enemy);
+    }
+
+    #[test]
+    fn test_weapon_returns_pistol_definition() {
+        let catalog = GameCatalog::default();
+
+        assert_eq!(catalog.weapon(WeaponKind::Pistol), &catalog.pistol);
+    }
+
+    #[test]
+    fn test_weapon_returns_smg_definition() {
+        let catalog = GameCatalog::default();
+
+        assert_eq!(catalog.weapon(WeaponKind::Smg), &catalog.smg);
+    }
+
+    #[test]
+    fn test_weapon_returns_shotgun_definition() {
+        let catalog = GameCatalog::default();
+
+        assert_eq!(catalog.weapon(WeaponKind::Shotgun), &catalog.shotgun);
     }
 }
