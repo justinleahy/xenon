@@ -3,13 +3,9 @@ use crate::app::game::{
     catalog::WeaponDefinition,
     components::{Enemy, PickupReward},
 };
+use engine::{EntityId, SceneObjectId, Sprite, Transform};
 
-use super::{
-    components::{
-        CircleCollider, Damage, DeathDrop, Health, Pickup, Projectile, Sprite, Transform,
-    },
-    entity::{EntityId, SceneObjectId},
-};
+use super::components::{CircleCollider, Damage, DeathDrop, Health, Pickup, Projectile};
 
 pub struct Scene {
     next_entity_id: u64,

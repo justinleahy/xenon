@@ -1,4 +1,5 @@
-use super::{EnemyKind, GameCatalog, Scene, SceneObjectId, WeaponKind};
+use super::{EnemyKind, GameCatalog, Scene, WeaponKind};
+use engine::SceneObjectId;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 

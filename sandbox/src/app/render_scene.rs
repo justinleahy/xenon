@@ -113,10 +113,10 @@ fn append_health_bar_sprites(sprites: &mut Vec<RenderSprite>, state: &SandboxSta
 
 #[cfg(test)]
 mod tests {
-    use super::super::game::components::{Sprite, Transform};
     use super::super::game::test_helpers::scene_with_only_player;
     use super::super::state::SandboxState;
     use super::*;
+    use engine::{Sprite, Transform};
 
     fn render_sprite_count(sprites: &[RenderSprite], expected: RenderSprite) -> usize {
         sprites.iter().filter(|sprite| **sprite == expected).count()

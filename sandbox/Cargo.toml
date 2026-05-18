@@ -2,10 +2,11 @@
 name = "sandbox"
 version = "0.1.0"
 edition = "2024"
+publish = false
 
 [dependencies]
 anyhow = "1.0.102"
-engine = { path = "../engine" }
+xenon-engine = { path = "../engine" }
 pollster = "0.4.0"
 serde = { version = "1.0.228", features = ["derive"] }
 softbuffer = "0.4.8"

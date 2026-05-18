@@ -104,9 +104,8 @@ impl SandboxState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::game::{
-        EnemyKind, EnemySpawnDefinition, PlayerSceneDefinition, SceneObjectId, WeaponKind,
-    };
+    use crate::app::game::{EnemyKind, EnemySpawnDefinition, PlayerSceneDefinition, WeaponKind};
+    use engine::SceneObjectId;
 
     #[test]
     fn test_reset_restores_initial_scene_definition() {

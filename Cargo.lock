@@ -433,18 +433,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edf234dd1594d6dd434a8fb8cada51ddbbc593e40e4a01556a0b31c62da2775b"
 
 [[package]]
-name = "engine"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "serde",
- "thiserror 2.0.18",
- "toml",
- "tracing",
- "wgpu",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1562,7 +1550,6 @@ name = "sandbox"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "engine",
  "pollster",
  "serde",
  "softbuffer",
@@ -1570,6 +1557,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "winit",
+ "xenon-engine",
 ]
 
 [[package]]
@@ -2717,6 +2705,18 @@ name = "xcursor"
 version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bec9e4a500ca8864c5b47b8b482a73d62e4237670e5b5f1d6b9e3cae50f28f2b"
+
+[[package]]
+name = "xenon-engine"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "serde",
+ "thiserror 2.0.18",
+ "toml",
+ "tracing",
+ "wgpu",
+]
 
 [[package]]
 name = "xkbcommon-dl"

@@ -18,8 +18,9 @@ Implemented so far:
 - `wgpu` clear pass and instanced 2D quad rendering.
 - Camera-following sprite scene.
 - Debug grid and player health bar.
-- Basic entity IDs, component storage, and scheduled gameplay systems.
-- Data-driven rendering through `Transform` and `Sprite` components.
+- Reusable scene primitives in `engine`: `EntityId`, `SceneObjectId`, `Transform`, and `Sprite`.
+- Sandbox-owned gameplay component storage and scheduled gameplay systems.
+- Data-driven rendering through engine `Transform` and `Sprite` components.
 - Demo scene loading from `sandbox/config/demo_scene.toml`.
 - Stable scene-object IDs for serialized scene enemies.
 - Catalog-driven enemy archetypes for basic, fast, and tank enemies.
@@ -34,8 +35,8 @@ The project is currently in Phase 3: entity, scene, and gameplay-system structur
 
 ## Repository Shape
 
-- `engine` contains reusable engine code: runtime config, lifecycle types, frame timing, fixed timestep, and rendering.
-- `sandbox` contains the first playable prototype and game-specific systems.
+- `engine` contains reusable engine code: runtime config, lifecycle types, frame timing, fixed timestep, rendering, and scene primitives.
+- `sandbox` contains the first playable prototype, game-specific scene storage, content definitions, and gameplay systems.
 
 Longer-term direction:
 
@@ -71,7 +72,7 @@ The current test suite covers runtime configuration, frame timing, fixed timeste
 
 ## Development Notes
 
-- Keep reusable engine behavior in `engine`.
-- Keep prototype-specific gameplay in `sandbox` until an engine abstraction proves itself.
+- Keep reusable engine behavior and primitives in `engine`.
+- Keep prototype-specific gameplay, content, and survival rules in `sandbox` until an engine abstraction proves itself.
 - Prefer small, testable gameplay systems over adding a broad ECS or plugin layer too early.
 - Validate each phase with a running demo, not only unit tests.

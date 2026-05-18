@@ -1,7 +1,11 @@
 [package]
-name = "engine"
+name = "xenon-engine"
 version = "0.1.0"
 edition = "2024"
+description = "Rust game engine"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/justinleahy/xenon"
+readme = "../README.md"
 
 [dependencies]
 bytemuck = { version = "1.25.0", features = ["derive"] }
