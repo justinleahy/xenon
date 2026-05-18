@@ -1,6 +1,6 @@
 use super::{
     AssetError, AssetId, AssetManifest, Handle, ShaderAsset, ShaderAssetEntry, TextureAsset,
-    TextureAssetEntry,
+    TextureAssetEntry, TextureData,
 };
 use std::{fs, path::PathBuf};
 
@@ -100,6 +100,33 @@ impl AssetManager {
             id: id.clone(),
             path,
             source,
+        })
+    }
+
+    pub fn load_texture_data(&self, id: &AssetId) -> Result<TextureData, AssetError> {
+        let path = self
+            .texture_file_path(id)
+            .ok_or_else(|| AssetError::MissingAsset { id: id.clone() })?;
+
+        let bytes = fs::read(&path).map_err(|source| AssetError::AssetRead {
+            id: id.clone(),
+            path: path.clone(),
+            source,
+        })?;
+
+        let image =
+            image::load_from_memory(&bytes).map_err(|source| AssetError::TextureDecode {
+                id: id.clone(),
+                path,
+                source,
+            })?;
+
+        let rgba = image.to_rgba8();
+
+        Ok(TextureData {
+            width: rgba.width(),
+            height: rgba.height(),
+            rgba: rgba.into_raw(),
         })
     }
 
@@ -365,6 +392,64 @@ mod tests {
                 assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
             }
             _ => panic!("expected asset read error"),
+        }
+    }
+
+    #[test]
+    fn test_load_texture_data_decodes_png_to_rgba() {
+        let asset_root = temp_asset_root("texture-data");
+        let texture_dir = asset_root.join("textures");
+        fs::create_dir_all(&texture_dir).unwrap();
+
+        let image = image::RgbaImage::from_raw(2, 1, vec![255, 0, 0, 255, 0, 255, 0, 128]).unwrap();
+        image.save(texture_dir.join("player.png")).unwrap();
+
+        let manager = AssetManager::with_root(test_manifest(), asset_root);
+
+        let texture = manager
+            .load_texture_data(&AssetId::new("textures/player"))
+            .unwrap();
+
+        assert_eq!(texture.width, 2);
+        assert_eq!(texture.height, 1);
+        assert_eq!(texture.rgba, vec![255, 0, 0, 255, 0, 255, 0, 128]);
+    }
+
+    #[test]
+    fn test_load_texture_data_returns_missing_asset_error() {
+        let manager = AssetManager::new(test_manifest());
+
+        let error = manager
+            .load_texture_data(&AssetId::new("textures/missing"))
+            .unwrap_err();
+
+        match error {
+            AssetError::MissingAsset { id } => {
+                assert_eq!(id, AssetId::new("textures/missing"));
+            }
+            _ => panic!("expected missing asset error"),
+        }
+    }
+
+    #[test]
+    fn test_load_texture_data_returns_decode_error_for_invalid_image_bytes() {
+        let asset_root = temp_asset_root("invalid-texture-data");
+        let texture_dir = asset_root.join("textures");
+        fs::create_dir_all(&texture_dir).unwrap();
+        fs::write(texture_dir.join("player.png"), b"not an image").unwrap();
+
+        let manager = AssetManager::with_root(test_manifest(), asset_root.clone());
+
+        let error = manager
+            .load_texture_data(&AssetId::new("textures/player"))
+            .unwrap_err();
+
+        match error {
+            AssetError::TextureDecode { id, path, .. } => {
+                assert_eq!(id, AssetId::new("textures/player"));
+                assert_eq!(path, asset_root.join("textures/player.png"));
+            }
+            _ => panic!("expected texture decode error"),
         }
     }
 

@@ -22,4 +22,11 @@ pub enum AssetError {
         path: PathBuf,
         source: io::Error,
     },
+
+    #[error("failed to decode texture `{id}` at {path}: {source}")]
+    TextureDecode {
+        id: AssetId,
+        path: PathBuf,
+        source: image::ImageError,
+    },
 }
