@@ -1,5 +1,5 @@
 use super::state::SandboxState;
-use engine::{RenderCamera, RenderScene, RenderSprite};
+use xenon_engine::{RenderCamera, RenderScene, RenderSprite};
 
 const PIXELS_PER_WORLD_UNIT: f32 = 32.0;
 
@@ -116,7 +116,7 @@ mod tests {
     use super::super::game::test_helpers::scene_with_only_player;
     use super::super::state::SandboxState;
     use super::*;
-    use engine::{Sprite, Transform};
+    use xenon_engine::{Sprite, Transform};
 
     fn render_sprite_count(sprites: &[RenderSprite], expected: RenderSprite) -> usize {
         sprites.iter().filter(|sprite| **sprite == expected).count()

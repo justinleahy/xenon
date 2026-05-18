@@ -1,9 +1,9 @@
 mod app;
 
 use app::SandboxApp;
-use engine::{EngineConfig, runtime::LifecycleEvent};
 use tracing::info;
 use winit::event_loop::EventLoop;
+use xenon_engine::{EngineConfig, runtime::LifecycleEvent};
 
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()

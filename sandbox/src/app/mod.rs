@@ -8,9 +8,6 @@ use self::{
     render_scene::{build_render_scene, build_render_sprites},
     state::SandboxState,
 };
-use engine::{
-    EngineConfig, FixedTimestep, FpsCounter, FrameClock, FrameTiming, LifecycleEvent, Renderer,
-};
 use std::sync::Arc;
 use tracing::info;
 use winit::{
@@ -18,6 +15,9 @@ use winit::{
     event::WindowEvent,
     event_loop::ActiveEventLoop,
     window::{Window, WindowId},
+};
+use xenon_engine::{
+    EngineConfig, FixedTimestep, FpsCounter, FrameClock, FrameTiming, LifecycleEvent, Renderer,
 };
 
 #[derive(Default)]

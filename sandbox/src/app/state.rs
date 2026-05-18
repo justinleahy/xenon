@@ -105,7 +105,7 @@ impl SandboxState {
 mod tests {
     use super::*;
     use crate::app::game::{EnemyKind, EnemySpawnDefinition, PlayerSceneDefinition, WeaponKind};
-    use engine::SceneObjectId;
+    use xenon_engine::SceneObjectId;
 
     #[test]
     fn test_reset_restores_initial_scene_definition() {

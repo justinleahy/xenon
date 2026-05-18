@@ -1,7 +1,7 @@
 use super::{EnemyKind, GameCatalog, Scene, WeaponKind};
-use engine::SceneObjectId;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use xenon_engine::SceneObjectId;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SceneDefinition {
