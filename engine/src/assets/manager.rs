@@ -85,7 +85,7 @@ impl AssetManager {
 
     pub fn load_shader_source(&mut self, id: &AssetId) -> Result<&str, AssetError> {
         if !self.shader_cache.contains_key(id) {
-            let shader = self.read_source_source(id)?;
+            let shader = self.read_shader_source(id)?;
             self.shader_cache.insert(id.clone(), shader);
         }
 
@@ -128,7 +128,7 @@ impl AssetManager {
         })
     }
 
-    fn read_source_source(&self, id: &AssetId) -> Result<String, AssetError> {
+    fn read_shader_source(&self, id: &AssetId) -> Result<String, AssetError> {
         let path = self
             .shader_file_path(id)
             .ok_or_else(|| AssetError::MissingAsset { id: id.clone() })?;
