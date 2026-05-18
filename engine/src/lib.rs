@@ -1,21 +1,29 @@
+#[cfg(feature = "assets")]
 pub mod assets;
+#[cfg(feature = "render")]
 pub mod render;
+#[cfg(feature = "runtime")]
 pub mod runtime;
+#[cfg(feature = "scene")]
 pub mod scene;
 
+#[cfg(feature = "assets")]
 pub use assets::{
     AssetError, AssetId, AssetManager, AssetManifest, Handle, ShaderAsset, ShaderAssetEntry,
     TextureAsset, TextureAssetEntry, TextureData,
 };
+#[cfg(feature = "render")]
 pub use render::{RenderCamera, RenderError, RenderScene, RenderSprite, Renderer, TextureResource};
+#[cfg(feature = "runtime")]
 pub use runtime::{
     EngineConfig, FixedStep, FixedSteps, FixedTimestep, FpsCounter, FrameClock, FrameTiming,
     LifecycleEvent, RuntimeError,
 };
+#[cfg(feature = "scene")]
 pub use scene::{EntityId, SceneObjectId, Sprite, Transform};
 
-#[cfg(test)]
-mod tests {
+#[cfg(all(test, feature = "assets"))]
+mod asset_feature_tests {
     use super::*;
 
     #[test]
@@ -30,6 +38,11 @@ mod tests {
         assert_eq!(texture.height, 1);
         assert_eq!(texture.rgba, vec![255, 255, 255, 255]);
     }
+}
+
+#[cfg(all(test, feature = "render"))]
+mod render_feature_tests {
+    use super::*;
 
     #[test]
     fn test_texture_resource_is_exported_from_crate_root() {

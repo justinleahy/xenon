@@ -9,11 +9,17 @@ readme = "../README.md"
 keywords = ["game-engine", "wgpu", "2d", "runtime"]
 categories = ["game-development", "rendering"]
 
+[features]
+default = ["assets", "render", "runtime", "scene"]
+assets = ["dep:image", "dep:serde", "dep:thiserror", "dep:toml"]
+render = ["assets", "dep:bytemuck", "dep:thiserror", "dep:wgpu"]
+runtime = ["dep:serde", "dep:thiserror", "dep:toml"]
+scene = ["dep:serde"]
+
 [dependencies]
-bytemuck = { version = "1.25.0", features = ["derive"] }
-image = "0.25.10"
-serde = { version = "1.0.228", features = ["derive"] }
-thiserror = "2.0.18"
-toml = "1.1.2"
-tracing = "0.1.44"
-wgpu = "29.0.3"
+bytemuck = { version = "1.25.0", features = ["derive"], optional = true }
+image = { version = "0.25.10", optional = true }
+serde = { version = "1.0.228", features = ["derive"], optional = true }
+thiserror = { version = "2.0.18", optional = true }
+toml = { version = "1.1.2", optional = true }
+wgpu = { version = "29.0.3", optional = true }

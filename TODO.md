@@ -38,7 +38,7 @@ This checklist mirrors `GAME_ENGINE_DEVELOPMENT_PHASES.md`. Completed items are 
 - [x] Logging and panic reporting.
 - [x] Configuration loading.
 - [x] Basic error handling patterns.
-- [ ] Feature flags for optional subsystems.
+- [x] Feature flags for optional subsystems.
 
 ### Deliverables
 
