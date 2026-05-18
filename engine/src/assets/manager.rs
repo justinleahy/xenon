@@ -1,4 +1,7 @@
-use super::{AssetError, AssetId, AssetManifest, Handle, ShaderAsset, TextureAsset};
+use super::{
+    AssetError, AssetId, AssetManifest, Handle, ShaderAsset, ShaderAssetEntry, TextureAsset,
+    TextureAssetEntry,
+};
 use std::path::Path;
 
 pub struct AssetManager {
@@ -29,14 +32,30 @@ impl AssetManager {
     }
 
     pub fn has_texture(&self, id: &AssetId) -> bool {
-        self.manifest
-            .textures
-            .iter()
-            .any(|texture| texture.id == *id)
+        self.texture_entry(id).is_some()
     }
 
     pub fn has_shader(&self, id: &AssetId) -> bool {
-        self.manifest.shaders.iter().any(|shader| shader.id == *id)
+        self.shader_entry(id).is_some()
+    }
+
+    pub fn texture_entry(&self, id: &AssetId) -> Option<&TextureAssetEntry> {
+        self.manifest
+            .textures
+            .iter()
+            .find(|texture| texture.id == *id)
+    }
+
+    pub fn shader_entry(&self, id: &AssetId) -> Option<&ShaderAssetEntry> {
+        self.manifest.shaders.iter().find(|shader| shader.id == *id)
+    }
+
+    pub fn texture_path(&self, id: &AssetId) -> Option<&str> {
+        self.texture_entry(id).map(|texture| texture.path.as_str())
+    }
+
+    pub fn shader_path(&self, id: &AssetId) -> Option<&str> {
+        self.shader_entry(id).map(|shader| shader.path.as_str())
     }
 
     pub fn manifest(&self) -> &AssetManifest {
@@ -106,6 +125,69 @@ mod tests {
         let manager = AssetManager::new(test_manifest());
 
         assert!(manager.shader("shaders/missing").is_none());
+    }
+
+    #[test]
+    fn test_texture_entry_returns_known_texture_metadata() {
+        let manager = AssetManager::new(test_manifest());
+        let id = AssetId::new("textures/player");
+
+        let entry = manager.texture_entry(&id).unwrap();
+
+        assert_eq!(&entry.id, &id);
+        assert_eq!(entry.path, "textures/player.png");
+    }
+
+    #[test]
+    fn test_shader_entry_returns_known_shader_metadata() {
+        let manager = AssetManager::new(test_manifest());
+        let id = AssetId::new("shaders/colored");
+
+        let entry = manager.shader_entry(&id).unwrap();
+
+        assert_eq!(&entry.id, &id);
+        assert_eq!(entry.path, "shaders/colored.wgsl");
+    }
+
+    #[test]
+    fn test_texture_path_returns_known_texture_path() {
+        let manager = AssetManager::new(test_manifest());
+        let id = AssetId::new("textures/player");
+
+        assert_eq!(manager.texture_path(&id), Some("textures/player.png"));
+    }
+
+    #[test]
+    fn test_shader_path_returns_known_shader_path() {
+        let manager = AssetManager::new(test_manifest());
+        let id = AssetId::new("shaders/colored");
+
+        assert_eq!(manager.shader_path(&id), Some("shaders/colored.wgsl"));
+    }
+
+    #[test]
+    fn test_asset_paths_return_none_for_missing_assets() {
+        let manager = AssetManager::new(test_manifest());
+
+        assert_eq!(
+            manager.texture_path(&AssetId::new("textures/missing")),
+            None
+        );
+        assert_eq!(manager.shader_path(&AssetId::new("shaders/missing")), None);
+    }
+
+    #[test]
+    fn test_texture_handle_and_path_resolve_same_asset_id() {
+        let manager = AssetManager::new(test_manifest());
+        let id = AssetId::new("textures/player");
+
+        let handle = manager.texture(id.as_str()).unwrap();
+
+        assert_eq!(handle.id(), &id);
+        assert_eq!(
+            manager.texture_path(handle.id()),
+            Some("textures/player.png")
+        );
     }
 
     #[test]
