@@ -2,21 +2,34 @@ use super::{
     AssetError, AssetId, AssetManifest, Handle, ShaderAsset, ShaderAssetEntry, TextureAsset,
     TextureAssetEntry,
 };
-use std::path::Path;
+use std::{fs, path::PathBuf};
 
 pub struct AssetManager {
     manifest: AssetManifest,
+    asset_root: PathBuf,
 }
 
 impl AssetManager {
     pub fn new(manifest: AssetManifest) -> Self {
-        Self { manifest }
+        Self::with_root(manifest, ".")
     }
 
-    pub fn load_manifest(path: impl AsRef<Path>) -> Result<Self, AssetError> {
-        let manifest = AssetManifest::load_from_file(path)?;
+    pub fn with_root(manifest: AssetManifest, asset_root: impl Into<PathBuf>) -> Self {
+        Self {
+            manifest,
+            asset_root: asset_root.into(),
+        }
+    }
 
-        Ok(Self::new(manifest))
+    pub fn load_manifest(path: impl Into<PathBuf>) -> Result<Self, AssetError> {
+        let path = path.into();
+        let manifest = AssetManifest::load_from_file(&path)?;
+        let asset_root = path
+            .parent()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
+
+        Ok(Self::with_root(manifest, asset_root))
     }
 
     pub fn texture(&self, id: impl Into<String>) -> Option<Handle<TextureAsset>> {
@@ -58,6 +71,26 @@ impl AssetManager {
         self.shader_entry(id).map(|shader| shader.path.as_str())
     }
 
+    pub fn texture_file_path(&self, id: &AssetId) -> Option<PathBuf> {
+        self.texture_path(id).map(|path| self.asset_root.join(path))
+    }
+
+    pub fn shader_file_path(&self, id: &AssetId) -> Option<PathBuf> {
+        self.shader_path(id).map(|path| self.asset_root.join(path))
+    }
+
+    pub fn load_shader_source(&self, id: &AssetId) -> Result<String, AssetError> {
+        let path = self
+            .shader_file_path(id)
+            .ok_or_else(|| AssetError::MissingAsset { id: id.clone() })?;
+
+        fs::read_to_string(&path).map_err(|source| AssetError::AssetRead {
+            id: id.clone(),
+            path,
+            source,
+        })
+    }
+
     pub fn manifest(&self) -> &AssetManifest {
         &self.manifest
     }
@@ -93,6 +126,15 @@ mod tests {
             .as_nanos();
 
         std::env::temp_dir().join(format!("xenon-assets-manager-{name}-{nanos}.toml"))
+    }
+
+    fn temp_asset_root(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+
+        std::env::temp_dir().join(format!("xenon-assets-manager-{name}-{nanos}"))
     }
 
     #[test]
@@ -188,6 +230,79 @@ mod tests {
             manager.texture_path(handle.id()),
             Some("textures/player.png")
         );
+    }
+
+    #[test]
+    fn test_texture_file_path_resolves_against_asset_root() {
+        let manager = AssetManager::with_root(test_manifest(), PathBuf::from("assets"));
+        let id = AssetId::new("textures/player");
+
+        assert_eq!(
+            manager.texture_file_path(&id),
+            Some(PathBuf::from("assets").join("textures/player.png"))
+        );
+    }
+
+    #[test]
+    fn test_shader_file_path_resolves_against_asset_root() {
+        let manager = AssetManager::with_root(test_manifest(), PathBuf::from("assets"));
+        let id = AssetId::new("shaders/colored");
+
+        assert_eq!(
+            manager.shader_file_path(&id),
+            Some(PathBuf::from("assets").join("shaders/colored.wgsl"))
+        );
+    }
+
+    #[test]
+    fn test_load_shader_source_reads_known_shader() {
+        let asset_root = temp_asset_root("shader-source");
+        let shader_dir = asset_root.join("shaders");
+        fs::create_dir_all(&shader_dir).unwrap();
+        fs::write(shader_dir.join("colored.wgsl"), "fn vertex_main() {}\n").unwrap();
+
+        let manager = AssetManager::with_root(test_manifest(), asset_root);
+
+        let source = manager
+            .load_shader_source(&AssetId::new("shaders/colored"))
+            .unwrap();
+
+        assert_eq!(source, "fn vertex_main() {}\n");
+    }
+
+    #[test]
+    fn test_load_shader_source_returns_missing_asset_error() {
+        let manager = AssetManager::new(test_manifest());
+
+        let error = manager
+            .load_shader_source(&AssetId::new("shaders/missing"))
+            .unwrap_err();
+
+        match error {
+            AssetError::MissingAsset { id } => {
+                assert_eq!(id, AssetId::new("shaders/missing"));
+            }
+            _ => panic!("expected missing asset error"),
+        }
+    }
+
+    #[test]
+    fn test_load_shader_source_returns_read_error_for_missing_file() {
+        let asset_root = temp_asset_root("missing-shader-file");
+        let manager = AssetManager::with_root(test_manifest(), asset_root.clone());
+
+        let error = manager
+            .load_shader_source(&AssetId::new("shaders/colored"))
+            .unwrap_err();
+
+        match error {
+            AssetError::AssetRead { id, path, source } => {
+                assert_eq!(id, AssetId::new("shaders/colored"));
+                assert_eq!(path, asset_root.join("shaders/colored.wgsl"));
+                assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
+            }
+            _ => panic!("expected asset read error"),
+        }
     }
 
     #[test]

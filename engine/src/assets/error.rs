@@ -1,3 +1,4 @@
+use super::AssetId;
 use std::{io, path::PathBuf};
 use thiserror::Error;
 
@@ -10,5 +11,15 @@ pub enum AssetError {
     ManifestParse {
         path: PathBuf,
         source: toml::de::Error,
+    },
+
+    #[error("asset `{id}` was not found in the manifest")]
+    MissingAsset { id: AssetId },
+
+    #[error("failed to read asset `{id}` at {path} : {source}")]
+    AssetRead {
+        id: AssetId,
+        path: PathBuf,
+        source: io::Error,
     },
 }
