@@ -75,7 +75,7 @@ This checklist mirrors `GAME_ENGINE_DEVELOPMENT_PHASES.md`. Completed items are 
 - [x] Camera-controlled scene.
 - [x] Texture rendering path.
 - [x] Debug grid or primitive overlay.
-- [ ] Renderer documentation explaining resource lifetime and ownership.
+- [x] Renderer documentation explaining resource lifetime and ownership.
 
 ### Exit Criteria
 

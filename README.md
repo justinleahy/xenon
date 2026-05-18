@@ -42,6 +42,7 @@ Longer-term direction:
 
 - [Engine charter](ENGINE_CHARTER.md)
 - [Development phases](GAME_ENGINE_DEVELOPMENT_PHASES.md)
+- [Renderer resource ownership](docs/renderer.md)
 - [Contributing rules](CONTRIBUTING.md)
 
 ## Run the Sandbox
