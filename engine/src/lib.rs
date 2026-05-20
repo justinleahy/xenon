@@ -9,8 +9,8 @@ pub mod scene;
 
 #[cfg(feature = "assets")]
 pub use assets::{
-    AssetError, AssetId, AssetManager, AssetManifest, Handle, ShaderAsset, ShaderAssetEntry,
-    TextureAsset, TextureAssetEntry, TextureData,
+    AssetError, AssetId, AssetKind, AssetManager, AssetManifest, Handle, ShaderAsset,
+    ShaderAssetEntry, TextureAsset, TextureAssetEntry, TextureData,
 };
 #[cfg(feature = "render")]
 pub use render::{

@@ -1,3 +1,23 @@
+[[textures]]
+id = "textures/dev/checker"
+path = "textures/dev/checker.png"
+
+[[textures]]
+id = "textures/dev/orientation"
+path = "textures/dev/orientation.png"
+
+[[textures]]
+id = "textures/dev/player"
+path = "textures/dev/player.png"
+
+[[textures]]
+id = "textures/dev/enemy"
+path = "textures/dev/enemy.png"
+
+[[textures]]
+id = "textures/dev/pickup"
+path = "textures/dev/pickup.png"
+
 [[shaders]]
 id = "shaders/colored"
 path = "shaders/colored.wgsl"

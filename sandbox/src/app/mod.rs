@@ -138,6 +138,44 @@ mod tests {
         assert!(asset_manifest_path().is_file());
         assert!(demo_scene_path().is_file());
     }
+
+    #[test]
+    fn test_sandbox_asset_manifest_entries_load() {
+        let mut assets = AssetManager::load_manifest(asset_manifest_path()).unwrap();
+
+        let texture_ids: Vec<_> = assets
+            .manifest()
+            .textures
+            .iter()
+            .map(|entry| entry.id.clone())
+            .collect();
+        let shader_ids: Vec<_> = assets
+            .manifest()
+            .shaders
+            .iter()
+            .map(|entry| entry.id.clone())
+            .collect();
+
+        assert!(!texture_ids.is_empty());
+        assert!(!shader_ids.is_empty());
+
+        for id in texture_ids {
+            let texture = assets.load_texture_data(&id).unwrap();
+
+            assert!(texture.width > 0);
+            assert!(texture.height > 0);
+            assert_eq!(
+                texture.rgba.len(),
+                (texture.width * texture.height * 4) as usize
+            );
+        }
+
+        for id in shader_ids {
+            let source = assets.load_shader_source(&id).unwrap();
+
+            assert!(!source.trim().is_empty());
+        }
+    }
 }
 
 impl ApplicationHandler for SandboxApp {

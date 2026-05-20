@@ -46,6 +46,12 @@ pub struct TextureAsset;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ShaderAsset;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AssetKind {
+    Shader,
+    Texture,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,14 +1,30 @@
 use super::{
-    AssetError, AssetId, AssetManifest, Handle, ShaderAsset, ShaderAssetEntry, TextureAsset,
-    TextureAssetEntry, TextureData,
+    AssetError, AssetId, AssetKind, AssetManifest, Handle, ShaderAsset, ShaderAssetEntry,
+    TextureAsset, TextureAssetEntry, TextureData,
 };
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+    time::SystemTime,
+};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReloadedAsset {
+    pub id: AssetId,
+    pub kind: AssetKind,
+}
+
+struct CachedAsset<T> {
+    value: T,
+    modified: SystemTime,
+}
 
 pub struct AssetManager {
     manifest: AssetManifest,
     asset_root: PathBuf,
-    shader_cache: HashMap<AssetId, String>,
-    texture_cache: HashMap<AssetId, TextureData>,
+    shader_cache: HashMap<AssetId, CachedAsset<String>>,
+    texture_cache: HashMap<AssetId, CachedAsset<TextureData>>,
 }
 
 impl AssetManager {
@@ -34,6 +50,58 @@ impl AssetManager {
             .unwrap_or_else(|| PathBuf::from("."));
 
         Ok(Self::with_root(manifest, asset_root))
+    }
+
+    pub fn reload_changed_assets(&mut self) -> Result<Vec<ReloadedAsset>, AssetError> {
+        let mut reloaded = Vec::new();
+
+        for id in self.shader_cache.keys().cloned().collect::<Vec<_>>() {
+            let Some(path) = self.shader_file_path(&id) else {
+                continue;
+            };
+
+            let modified = modified_time(&path).map_err(|source| AssetError::AssetRead {
+                id: id.clone(),
+                path: path.clone(),
+                source,
+            })?;
+
+            if modified > self.shader_cache.get(&id).unwrap().modified {
+                let value = self.read_shader_source(&id)?;
+
+                self.shader_cache
+                    .insert(id.clone(), CachedAsset { value, modified });
+                reloaded.push(ReloadedAsset {
+                    id,
+                    kind: AssetKind::Shader,
+                })
+            }
+        }
+
+        for id in self.texture_cache.keys().cloned().collect::<Vec<_>>() {
+            let Some(path) = self.texture_file_path(&id) else {
+                continue;
+            };
+
+            let modified = modified_time(&path).map_err(|source| AssetError::AssetRead {
+                id: id.clone(),
+                path: path.clone(),
+                source,
+            })?;
+
+            if modified > self.texture_cache.get(&id).unwrap().modified {
+                let value = self.read_texture_data(&id)?;
+
+                self.texture_cache
+                    .insert(id.clone(), CachedAsset { value, modified });
+                reloaded.push(ReloadedAsset {
+                    id,
+                    kind: AssetKind::Texture,
+                })
+            }
+        }
+
+        Ok(reloaded)
     }
 
     pub fn texture(&self, id: impl Into<String>) -> Option<Handle<TextureAsset>> {
@@ -85,20 +153,42 @@ impl AssetManager {
 
     pub fn load_shader_source(&mut self, id: &AssetId) -> Result<&str, AssetError> {
         if !self.shader_cache.contains_key(id) {
-            let shader = self.read_shader_source(id)?;
-            self.shader_cache.insert(id.clone(), shader);
+            let path = self
+                .shader_file_path(id)
+                .ok_or_else(|| AssetError::MissingAsset { id: id.clone() })?;
+
+            let value = self.read_shader_source(id)?;
+            let modified = modified_time(&path).map_err(|source| AssetError::AssetRead {
+                id: id.clone(),
+                path,
+                source,
+            })?;
+
+            self.shader_cache
+                .insert(id.clone(), CachedAsset { value, modified });
         }
 
-        Ok(self.shader_cache.get(id).unwrap().as_str())
+        Ok(self.shader_cache.get(id).unwrap().value.as_str())
     }
 
     pub fn load_texture_data(&mut self, id: &AssetId) -> Result<&TextureData, AssetError> {
         if !self.texture_cache.contains_key(id) {
-            let texture = self.read_texture_data(id)?;
-            self.texture_cache.insert(id.clone(), texture);
+            let path = self
+                .texture_file_path(id)
+                .ok_or_else(|| AssetError::MissingAsset { id: id.clone() })?;
+
+            let value = self.read_texture_data(id)?;
+            let modified = modified_time(&path).map_err(|source| AssetError::AssetRead {
+                id: id.clone(),
+                path,
+                source,
+            })?;
+
+            self.texture_cache
+                .insert(id.clone(), CachedAsset { value, modified });
         }
 
-        Ok(self.texture_cache.get(id).unwrap())
+        Ok(&self.texture_cache.get(id).unwrap().value)
     }
 
     fn read_texture_data(&self, id: &AssetId) -> Result<TextureData, AssetError> {
@@ -178,14 +268,19 @@ impl AssetManager {
     }
 }
 
+fn modified_time(path: &Path) -> Result<SystemTime, std::io::Error> {
+    fs::metadata(path)?.modified()
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::{ShaderAssetEntry, TextureAssetEntry};
     use super::*;
     use std::{
         fs,
-        path::PathBuf,
-        time::{SystemTime, UNIX_EPOCH},
+        path::{Path, PathBuf},
+        thread,
+        time::{Duration, SystemTime, UNIX_EPOCH},
     };
 
     fn test_manifest() -> AssetManifest {
@@ -217,6 +312,29 @@ mod tests {
             .as_nanos();
 
         std::env::temp_dir().join(format!("xenon-assets-manager-{name}-{nanos}"))
+    }
+
+    fn save_test_texture(path: &Path, rgba: [u8; 4]) {
+        let image = image::RgbaImage::from_raw(1, 1, rgba.to_vec()).unwrap();
+        image.save(path).unwrap();
+    }
+
+    fn rewrite_until_modified_after(
+        path: &Path,
+        previous_modified: SystemTime,
+        mut rewrite: impl FnMut(),
+    ) {
+        for _ in 0..100 {
+            thread::sleep(Duration::from_millis(20));
+            rewrite();
+
+            let modified = fs::metadata(path).unwrap().modified().unwrap();
+            if modified > previous_modified {
+                return;
+            }
+        }
+
+        panic!("failed to produce a newer modification timestamp for {path:?}");
     }
 
     #[test]
@@ -612,5 +730,92 @@ path = "shaders/colored.wgsl"
 
         assert_eq!(manager.cached_shader_count(), 0);
         assert_eq!(manager.cached_texture_count(), 0);
+    }
+
+    #[test]
+    fn test_reload_unchanged_assets_returns_empty_list() {
+        let asset_root = temp_asset_root("reload-unchanged");
+        let shader_dir = asset_root.join("shaders");
+        let texture_dir = asset_root.join("textures");
+        fs::create_dir_all(&shader_dir).unwrap();
+        fs::create_dir_all(&texture_dir).unwrap();
+
+        fs::write(shader_dir.join("colored.wgsl"), "shader").unwrap();
+        save_test_texture(&texture_dir.join("player.png"), [255, 255, 255, 255]);
+
+        let mut manager = AssetManager::with_root(test_manifest(), asset_root);
+
+        manager
+            .load_shader_source(&AssetId::new("shaders/colored"))
+            .unwrap();
+        manager
+            .load_texture_data(&AssetId::new("textures/player"))
+            .unwrap();
+
+        assert!(manager.reload_changed_assets().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_reload_changed_shader_updates_cache() {
+        let asset_root = temp_asset_root("reload-shader");
+        let shader_dir = asset_root.join("shaders");
+        fs::create_dir_all(&shader_dir).unwrap();
+
+        let shader_path = shader_dir.join("colored.wgsl");
+        fs::write(&shader_path, "first").unwrap();
+
+        let mut manager = AssetManager::with_root(test_manifest(), asset_root);
+        let id = AssetId::new("shaders/colored");
+
+        assert_eq!(manager.load_shader_source(&id).unwrap(), "first");
+
+        let previous_modified = fs::metadata(&shader_path).unwrap().modified().unwrap();
+        rewrite_until_modified_after(&shader_path, previous_modified, || {
+            fs::write(&shader_path, "second").unwrap();
+        });
+
+        assert_eq!(
+            manager.reload_changed_assets().unwrap(),
+            vec![ReloadedAsset {
+                id: id.clone(),
+                kind: AssetKind::Shader,
+            }]
+        );
+        assert_eq!(manager.load_shader_source(&id).unwrap(), "second");
+    }
+
+    #[test]
+    fn test_reload_changed_texture_updates_cache() {
+        let asset_root = temp_asset_root("reload-texture");
+        let texture_dir = asset_root.join("textures");
+        fs::create_dir_all(&texture_dir).unwrap();
+
+        let texture_path = texture_dir.join("player.png");
+        save_test_texture(&texture_path, [255, 0, 0, 255]);
+
+        let mut manager = AssetManager::with_root(test_manifest(), asset_root);
+        let id = AssetId::new("textures/player");
+
+        assert_eq!(
+            manager.load_texture_data(&id).unwrap().rgba,
+            vec![255, 0, 0, 255]
+        );
+
+        let previous_modified = fs::metadata(&texture_path).unwrap().modified().unwrap();
+        rewrite_until_modified_after(&texture_path, previous_modified, || {
+            save_test_texture(&texture_path, [0, 255, 0, 255]);
+        });
+
+        assert_eq!(
+            manager.reload_changed_assets().unwrap(),
+            vec![ReloadedAsset {
+                id: id.clone(),
+                kind: AssetKind::Texture,
+            }]
+        );
+        assert_eq!(
+            manager.load_texture_data(&id).unwrap().rgba,
+            vec![0, 255, 0, 255]
+        );
     }
 }

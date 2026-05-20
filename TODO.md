@@ -116,7 +116,7 @@ This checklist mirrors `GAME_ENGINE_DEVELOPMENT_PHASES.md`. Completed items are 
 
 - [x] Asset registry.
 - [x] Asset handles.
-- [ ] Loading, caching, and unloading.
+- [x] Loading, caching, and unloading.
 - [ ] Hot reload for development.
 - [ ] Import steps for textures, meshes, shaders, fonts, audio, and scenes.
 - [ ] Asset dependency tracking.
